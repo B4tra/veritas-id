@@ -1,0 +1,120 @@
+/* VERITAS-ID Custom Premium Styling */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header Banner Styling */
+.main-header {
+    background: linear-gradient(135deg, #1e1e38 0%, #0d1117 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2.5rem 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.main-header h1 {
+    color: #ffffff !important;
+    font-weight: 800;
+    font-size: 2.5rem;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.main-header p {
+    color: #a0aec0 !important;
+    font-size: 1.05rem;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+/* Badge Label Styles */
+.badge-result {
+    display: inline-block;
+    padding: 0.6rem 1.4rem;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.badge-danger {
+    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+    color: #ffffff !important;
+    border: 1px solid #feb2b2;
+}
+
+.badge-success {
+    background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+    color: #ffffff !important;
+    border: 1px solid #9ae6b4;
+}
+
+.badge-warning {
+    background: linear-gradient(135deg, #dd6b20 0%, #c05621 100%);
+    color: #ffffff !important;
+    border: 1px solid #fbd38d;
+}
+
+/* Glassmorphism Card Container */
+.veritas-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.veritas-card:hover {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.ref-card {
+    border-left: 4px solid #3182ce;
+    background: rgba(49, 130, 206, 0.06);
+    border-radius: 10px;
+    padding: 1.2rem;
+    margin-top: 1rem;
+}
+
+.ref-card.hoax {
+    border-left-color: #e53e3e;
+    background: rgba(229, 62, 62, 0.06);
+}
+
+.ref-card.fakta {
+    border-left-color: #38a169;
+    background: rgba(56, 161, 105, 0.06);
+}
+
+/* Keyword Highlights */
+.word-tag {
+    display: inline-block;
+    background: rgba(229, 62, 62, 0.2);
+    color: #fc8181;
+    border: 1px solid rgba(229, 62, 62, 0.4);
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.2rem;
+}
+
+/* Footer disclaimer box */
+.disclaimer-box {
+    background: rgba(237, 137, 54, 0.1);
+    border: 1px solid rgba(237, 137, 54, 0.3);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    color: #ed8936;
+    font-size: 0.9rem;
+    margin-top: 2rem;
+}

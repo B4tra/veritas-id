@@ -1,0 +1,6 @@
+[2026-08-07 22:02:49] === Memulai Eksekusi Penjadwalan Harian VERITAS-ID ===
+[2026-08-07 22:02:53] Scraping selesai. Total terambil: 15, Artikel Baru Dimasukkan: 2
+[2026-08-07 22:02:53] Melatih ulang model NLP & LSTM...
+[2026-08-07 22:02:53] Model NLP, LSTM, dan CrossChecker berhasil diperbarui!
+[2026-08-07 22:02:53] File config.json tidak ditemukan. Melewati pengiriman email notification.
+[2026-08-07 22:02:53] === Penjadwalan Harian Selesai ===
