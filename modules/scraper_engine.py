@@ -26,6 +26,7 @@ def scrape_turnbackhoax(limit=5):
     """Scrape real live hoax articles from TurnBackHoax.id"""
     items = []
     url = "https://turnbackhoax.id/"
+    today_str = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         res = requests.get(url, headers=HEADERS, verify=False, timeout=8)
         if res.status_code == 200:
@@ -49,10 +50,14 @@ def scrape_turnbackhoax(limit=5):
                 
                 parent = a.find_parent(["article", "div", "li"])
                 snippet = ""
+                pub_date = today_str
                 if parent:
                     p = parent.find("p")
                     if p:
                         snippet = clean_text(p.get_text())
+                    time_elem = parent.find("time") or parent.find("span", class_=lambda c: c and "date" in str(c).lower())
+                    if time_elem:
+                        pub_date = clean_text(time_elem.get_text())
                         
                 verdict = f"SALAH / HOAX. Artikel terverifikasi dari TurnBackHoax.id. {snippet[:200]}"
                 
@@ -64,7 +69,8 @@ def scrape_turnbackhoax(limit=5):
                     "category": "Hoax Media Sosial",
                     "source_name": "TurnBackHoax.id (MAFINDO)",
                     "source_url": href,
-                    "verdict_details": verdict
+                    "verdict_details": verdict,
+                    "published_at": pub_date
                 })
     except Exception as e:
         print(f"[Scraper Error] TurnBackHoax: {e}")
@@ -74,6 +80,7 @@ def scrape_cnn_indonesia(limit=5):
     """Scrape real live verified news articles from CNN Indonesia"""
     items = []
     url = "https://www.cnnindonesia.com/nasional"
+    today_str = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         res = requests.get(url, headers=HEADERS, verify=False, timeout=8)
         if res.status_code == 200:
@@ -106,7 +113,8 @@ def scrape_cnn_indonesia(limit=5):
                     "category": "Berita Nasional CNN",
                     "source_name": "CNN Indonesia",
                     "source_url": href,
-                    "verdict_details": "TERVERIFIKASI FAKTA. Liputan jurnalistik resmi dari CNN Indonesia."
+                    "verdict_details": "TERVERIFIKASI FAKTA. Liputan jurnalistik resmi dari CNN Indonesia.",
+                    "published_at": today_str
                 })
     except Exception as e:
         print(f"[Scraper Error] CNN Indonesia: {e}")
@@ -116,6 +124,7 @@ def scrape_antara_news(limit=5):
     """Scrape real live verified news articles from LKBN ANTARA News"""
     items = []
     url = "https://www.antaranews.com/top-news"
+    today_str = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         res = requests.get(url, headers=HEADERS, verify=False, timeout=8)
         if res.status_code == 200:
@@ -147,7 +156,8 @@ def scrape_antara_news(limit=5):
                     "category": "Berita Resmi ANTARA",
                     "source_name": "ANTARA News",
                     "source_url": href,
-                    "verdict_details": "TERVERIFIKASI FAKTA. Kantor Berita Indonesia (LKBN ANTARA)."
+                    "verdict_details": "TERVERIFIKASI FAKTA. Kantor Berita Indonesia (LKBN ANTARA).",
+                    "published_at": today_str
                 })
     except Exception as e:
         print(f"[Scraper Error] ANTARA: {e}")
@@ -169,15 +179,17 @@ def run_scraping_pipeline(limit_per_source=5):
     cursor = conn.cursor()
     
     inserted_count = 0
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S")
     for item in all_new_items:
         cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE title = ? OR claim = ?", (item["title"], item["claim"]))
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
-                INSERT INTO fact_checks (title, claim, content, label, category, source_name, source_url, verdict_details)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO fact_checks (title, claim, content, label, category, source_name, source_url, verdict_details, published_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item["title"], item["claim"], item["content"], item["label"],
-                item["category"], item["source_name"], item["source_url"], item["verdict_details"]
+                item["category"], item["source_name"], item["source_url"], item["verdict_details"],
+                item.get("published_at", now_str), now_str
             ))
             inserted_count += 1
             

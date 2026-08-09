@@ -23,10 +23,17 @@ def init_database(db_path):
             source_name TEXT,
             source_url TEXT,
             verdict_details TEXT,
+            published_at TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
+    # Check if published_at column exists in existing DBs
+    try:
+        cursor.execute("ALTER TABLE fact_checks ADD COLUMN published_at TEXT")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+        
     # Table 2: User search history
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS search_history (

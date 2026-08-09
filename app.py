@@ -210,23 +210,47 @@ with tab_database:
     st.markdown("### 📚 Korpus Multi-Sumber Cek Fakta Indonesia")
     st.caption("Basis data rujukan terstruktur yang digunakan untuk verifikasi silang dan pelatihan model NLP VERITAS-ID.")
     
-    fact_records = fetch_all_fact_checks()
+    col_f1, col_f2 = st.columns([1.5, 1])
+    with col_f1:
+        filter_label = st.multiselect("Filter Kelas Label", options=["HOAX", "FAKTA"], default=["HOAX", "FAKTA"])
+    with col_f2:
+        sort_choice = st.selectbox("⏳ Urutkan Berdasarkan Waktu/Tanggal:", options=[
+            "🆕 Terbaru (Newest First)",
+            "📜 Terlama (Oldest First)",
+            "🔢 ID (Urutan Masuk)"
+        ])
+
+    order_mapping = {
+        "🆕 Terbaru (Newest First)": "created_at DESC",
+        "📜 Terlama (Oldest First)": "created_at ASC",
+        "🔢 ID (Urutan Masuk)": "id ASC"
+    }
+    selected_order = order_mapping.get(sort_choice, "created_at DESC")
+
+    fact_records = fetch_all_fact_checks(order_by=selected_order)
     if fact_records:
         df = pd.DataFrame(fact_records)
-        df_display = df[['id', 'label', 'source_name', 'category', 'title', 'verdict_details', 'source_url']]
         
-        filter_label = st.multiselect("Filter Kelas Label", options=["HOAX", "FAKTA"], default=["HOAX", "FAKTA"])
+        # Ensure published_at / created_at is present
+        if "published_at" not in df.columns:
+            df["published_at"] = df["created_at"]
+        else:
+            df["published_at"] = df["published_at"].fillna(df["created_at"])
+            
+        df_display = df[['id', 'label', 'created_at', 'source_name', 'category', 'title', 'verdict_details', 'source_url']]
         df_filtered = df_display[df_display['label'].isin(filter_label)]
         
         st.dataframe(
             df_filtered,
             column_config={
-                "source_url": st.column_config.LinkColumn("Tautan Asli Sumber"),
-                "title": "Judul Artikel/Klaim",
+                "id": st.column_config.NumberColumn("ID", format="%d"),
                 "label": "Kelas Label",
+                "created_at": st.column_config.TextColumn("📅 Tanggal & Waktu Rilis / Input"),
                 "source_name": "Lembaga Sumber",
                 "category": "Kategori",
-                "verdict_details": "Rincian Verifikasi Fakta"
+                "title": "Judul Artikel / Klaim",
+                "verdict_details": "Rincian Verifikasi Fakta",
+                "source_url": st.column_config.LinkColumn("Tautan Asli Sumber")
             },
             hide_index=True,
             use_container_width=True

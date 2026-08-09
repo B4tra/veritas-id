@@ -9,11 +9,21 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def fetch_all_fact_checks():
-    """Retrieve all fact check entries from SQLite."""
+def fetch_all_fact_checks(order_by="created_at DESC"):
+    """Retrieve all fact check entries from SQLite with specified time/id ordering."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM fact_checks ORDER BY id ASC")
+    # Validate order_by to prevent SQL injection
+    allowed_orders = {
+        "created_at DESC": "created_at DESC, id DESC",
+        "created_at ASC": "created_at ASC, id ASC",
+        "published_at DESC": "published_at DESC, id DESC",
+        "published_at ASC": "published_at ASC, id ASC",
+        "id ASC": "id ASC",
+        "id DESC": "id DESC"
+    }
+    sql_order = allowed_orders.get(order_by, "created_at DESC, id DESC")
+    cursor.execute(f"SELECT * FROM fact_checks ORDER BY {sql_order}")
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
