@@ -349,7 +349,10 @@ with tab_admin:
                     st.error("⚠️ Mohon lengkapi ketiga kolom email & App Password di atas terlebih dahulu.")
                 else:
                     with st.spinner("⏳ Menghubungkan ke server Gmail SMTP dan mengirimkan email uji coba..."):
-                        test_res = send_test_email(cfg_sender, cfg_app_pass, cfg_recipient)
+                        import importlib
+                        import modules.email_service
+                        importlib.reload(modules.email_service)
+                        test_res = modules.email_service.send_test_email(cfg_sender, cfg_app_pass, cfg_recipient)
                         if test_res["success"]:
                             st.success(f"✅ {test_res['message']}")
                         else:
