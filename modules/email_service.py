@@ -158,13 +158,20 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
         return {"success": False, "message": f"Gagal mengirim email: {str(e)}"}
 
 def send_test_email(sender_email, app_password, recipient_email):
-    """Send a quick test email to verify Gmail credentials."""
+    """Send a test email using real live database stats and recent sample articles."""
+    try:
+        from modules.database import fetch_all_fact_checks
+        records = fetch_all_fact_checks()
+        sample_titles = [r.get("title", "") for r in records[:5]] if records else []
+    except Exception:
+        sample_titles = []
+
     test_data = {
-        "inserted_count": 1,
-        "total_scraped": 3,
-        "tbh_count": 1,
-        "cnn_count": 1,
-        "antara_count": 1,
-        "items_sample": ["[UJI COBA] Sistem Notifikasi Email VERITAS-ID Berhasil Terhubung!"]
+        "inserted_count": 0,
+        "total_scraped": 0,
+        "tbh_count": 0,
+        "cnn_count": 0,
+        "antara_count": 0,
+        "items_sample": sample_titles
     }
     return send_gmail_report(sender_email, app_password, recipient_email, test_data)
