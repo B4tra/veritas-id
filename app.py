@@ -227,7 +227,14 @@ with tab_database:
     }
     selected_order = order_mapping.get(sort_choice, "created_at DESC")
 
-    fact_records = fetch_all_fact_checks(order_by=selected_order)
+    try:
+        fact_records = fetch_all_fact_checks(order_by=selected_order)
+    except TypeError:
+        import importlib
+        import modules.database
+        importlib.reload(modules.database)
+        from modules.database import fetch_all_fact_checks
+        fact_records = fetch_all_fact_checks(order_by=selected_order)
     if fact_records:
         df = pd.DataFrame(fact_records)
         
