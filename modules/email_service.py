@@ -17,7 +17,7 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
         msg["From"] = f"VERITAS-ID Bot <{sender_email}>"
         msg["To"] = recipient_email
         
-        # Build HTML content & fetch total DB metrics
+        # Fetch total database metrics from SQLite
         try:
             from modules.database import fetch_all_fact_checks
             all_records = fetch_all_fact_checks()
@@ -25,31 +25,32 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
             hoax_db = len([r for r in all_records if r.get("label") == "HOAX"])
             fakta_db = len([r for r in all_records if r.get("label") == "FAKTA"])
         except Exception:
-            total_db = report_data.get("inserted_count", 0)
-            hoax_db = report_data.get("tbh_count", 0)
-            fakta_db = report_data.get("cnn_count", 0) + report_data.get("antara_count", 0)
+            total_db = 0
+            hoax_db = 0
+            fakta_db = 0
 
+        # Incremental daily scraping statistics
         inserted = report_data.get("inserted_count", 0)
-        total_scraped = report_data.get("total_scraped", 0)
+        tbh_cnt = report_data.get("tbh_count", 0)
+        cnn_cnt = report_data.get("cnn_count", 0)
+        antara_cnt = report_data.get("antara_count", 0)
+        fakta_new_cnt = cnn_cnt + antara_cnt
         items_sample = report_data.get("items_sample", [])
         
-        # If no items in sample, pick top 5 recent articles from DB
-        if not items_sample and 'all_records' in locals() and all_records:
-            items_sample = [r.get("title", "") for r in all_records[:5]]
-
+        # Build items table HTML for newly scraped articles
         items_html = ""
-        for idx, item_title in enumerate(items_sample, 1):
-            badge = "🔴 HOAX" if "[PENIPUAN]" in item_title or "[SALAH]" in item_title or "TurnBackHoax" in item_title or "HOAX" in item_title else "🟢 FAKTA"
-            items_html += f"""
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px; font-weight: bold;">{idx}</td>
-                <td style="padding: 10px;">{badge}</td>
-                <td style="padding: 10px;">{item_title}</td>
-            </tr>
-            """
-            
-        if not items_html:
-            items_html = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096;">Semua data terkini sudah terverifikasi up-to-date.</td></tr>'
+        if items_sample:
+            for idx, item_title in enumerate(items_sample, 1):
+                badge = "🔴 HOAX" if "[PENIPUAN]" in item_title or "[SALAH]" in item_title or "TurnBackHoax" in item_title or "HOAX" in item_title else "🟢 FAKTA"
+                items_html += f"""
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 10px; font-weight: bold; width: 40px;">{idx}</td>
+                    <td style="padding: 10px; width: 100px;">{badge}</td>
+                    <td style="padding: 10px;">{item_title}</td>
+                </tr>
+                """
+        else:
+            items_html = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096; background: #f7fafc;">Semua berita terkini sudah up-to-date. Tidak ada artikel duplikat baru yang ditambahkan pada pemutakhiran ini.</td></tr>'
 
         html_body = f"""
         <!DOCTYPE html>
@@ -62,11 +63,13 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
                 .header h1 {{ margin: 0; font-size: 24px; font-weight: 800; }}
                 .header p {{ margin-top: 5px; color: #a0aec0; font-size: 14px; }}
                 .content {{ padding: 25px; color: #2d3748; }}
-                .stat-card {{ background: #ebf8ff; border-left: 4px solid #3182ce; padding: 15px; border-radius: 6px; margin-bottom: 20px; }}
-                .stat-grid {{ display: table; width: 100%; margin-bottom: 20px; }}
-                .stat-cell {{ display: table-cell; width: 33%; text-align: center; background: #f7fafc; padding: 12px; border-radius: 8px; border: 1px solid #edf2f7; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
+                .sec-title {{ color: #2b6cb0; font-size: 16px; font-weight: 700; margin-top: 10px; margin-bottom: 12px; }}
+                .stat-grid {{ display: table; width: 100%; margin-bottom: 15px; }}
+                .stat-cell-scraping {{ display: table-cell; width: 33%; text-align: center; background: #ebf8ff; padding: 12px; border-radius: 8px; border: 1px solid #bee3f8; }}
+                .stat-cell-db {{ display: table-cell; width: 33%; text-align: center; background: #f7fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }}
+                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }}
                 th {{ background: #edf2f7; padding: 10px; text-align: left; font-size: 13px; color: #4a5568; }}
+                .divider {{ border-top: 2px dashed #e2e8f0; margin: 25px 0; }}
                 .footer {{ background: #f7fafc; text-align: center; padding: 15px; font-size: 12px; color: #a0aec0; border-top: 1px solid #edf2f7; }}
             </style>
         </head>
@@ -77,27 +80,25 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
                     <p>Laporan Pemutakhiran Otomatis Web Scraper & Deteksi Hoax Harian</p>
                 </div>
                 <div class="content">
-                    <div class="stat-card">
-                        <h3 style="margin-top:0; color: #2b6cb0;">📊 Ringkasan Pemutakhiran ({time.strftime('%Y-%m-%d %H:%M:%S')})</h3>
-                        <p style="margin: 0; font-size: 15px;">Penambahan Hari Ini: <strong>{inserted} Artikel Baru</strong> (Terambil {total_scraped} artikel). Sistem telah memperbarui model klasifikasi NLP & LSTM secara otomatis.</p>
-                    </div>
-
+                    
+                    <!-- BAGIAN 1: INFORMASI ARTIKEL HASIL SCRAPING TERBARU -->
+                    <div class="sec-title">🔄 1. Hasil Pemutakhiran Web Scraping Terbaru ({time.strftime('%Y-%m-%d %H:%M:%S')})</div>
                     <div class="stat-grid">
-                        <div class="stat-cell">
-                            <span style="font-size: 22px; font-weight: bold; color: #2b6cb0;">{total_db}</span><br>
-                            <small style="color: #718096;">Total Data Cek Fakta</small>
+                        <div class="stat-cell-scraping">
+                            <span style="font-size: 22px; font-weight: bold; color: #2b6cb0;">{inserted}</span><br>
+                            <small style="color: #4a5568;">Artikel Baru Ter-scrape</small>
                         </div>
-                        <div class="stat-cell">
-                            <span style="font-size: 22px; font-weight: bold; color: #e53e3e;">{hoax_db}</span><br>
-                            <small style="color: #718096;">Jumlah Data HOAX</small>
+                        <div class="stat-cell-scraping">
+                            <span style="font-size: 22px; font-weight: bold; color: #e53e3e;">{tbh_cnt}</span><br>
+                            <small style="color: #4a5568;">Hoax Baru (TurnBackHoax)</small>
                         </div>
-                        <div class="stat-cell">
-                            <span style="font-size: 22px; font-weight: bold; color: #38a169;">{fakta_db}</span><br>
-                            <small style="color: #718096;">Jumlah Data FAKTA</small>
+                        <div class="stat-cell-scraping">
+                            <span style="font-size: 22px; font-weight: bold; color: #38a169;">{fakta_new_cnt}</span><br>
+                            <small style="color: #4a5568;">Fakta Baru (CNN & Antara)</small>
                         </div>
                     </div>
 
-                    <h4>📰 Sampel Artikel Terbaru dalam Database:</h4>
+                    <h4 style="margin-bottom: 8px; color: #2d3748;">📰 Rincian Artikel Hasil Scraping Terbaru Ditambahkan:</h4>
                     <table>
                         <thead>
                             <tr>
@@ -111,8 +112,27 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
                         </tbody>
                     </table>
 
-                    <p style="margin-top: 25px; font-size: 13px; color: #718096;">
-                        💡 <em>Model NLP (Logistic Regression) & Deep Learning (LSTM) telah dilatih ulang secara otomatis menggunakan korpus data terbaru ini.</em>
+                    <div class="divider"></div>
+
+                    <!-- BAGIAN 2: INFORMASI TOTAL KESELURUHAN DATABASE -->
+                    <div class="sec-title">📊 2. Status Total Akumulasi Database Saat Ini</div>
+                    <div class="stat-grid">
+                        <div class="stat-cell-db">
+                            <span style="font-size: 22px; font-weight: bold; color: #2b6cb0;">{total_db}</span><br>
+                            <small style="color: #718096;">Total Data Cek Fakta</small>
+                        </div>
+                        <div class="stat-cell-db">
+                            <span style="font-size: 22px; font-weight: bold; color: #e53e3e;">{hoax_db}</span><br>
+                            <small style="color: #718096;">Jumlah Data HOAX</small>
+                        </div>
+                        <div class="stat-cell-db">
+                            <span style="font-size: 22px; font-weight: bold; color: #38a169;">{fakta_db}</span><br>
+                            <small style="color: #718096;">Jumlah Data FAKTA</small>
+                        </div>
+                    </div>
+
+                    <p style="margin-top: 20px; font-size: 13px; color: #718096;">
+                        💡 <em>Model NLP (Logistic Regression) & Deep Learning (LSTM) telah dilatih ulang secara otomatis menggunakan total korpus data terbaru ini.</em>
                     </p>
                 </div>
                 <div class="footer">
