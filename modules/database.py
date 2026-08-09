@@ -9,8 +9,13 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def fetch_all_fact_checks(order_by="created_at DESC"):
+def fetch_all_fact_checks(order_by="created_at DESC", *args, **kwargs):
     """Retrieve all fact check entries from SQLite with specified time/id ordering."""
+    if not order_by and "order_by" in kwargs:
+        order_by = kwargs["order_by"]
+    if not isinstance(order_by, str):
+        order_by = "created_at DESC"
+        
     conn = get_connection()
     cursor = conn.cursor()
     # Validate order_by to prevent SQL injection
