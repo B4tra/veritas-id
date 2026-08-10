@@ -1,16 +1,18 @@
 import numpy as np
 import random
 from modules.database import fetch_all_fact_checks
-from modules.nlp_engine import preprocess_text, HOAX_SIGNALS
+from modules.nlp_engine import preprocess_text, HOAX_SIGNALS, extract_text_features
 
 try:
-    import tensorflow as tf
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Embedding, LSTM, Dense
-    from tensorflow.keras.preprocessing.text import Tokenizer
-    from tensorflow.keras.preprocessing.sequence import pad_sequences
+    import tensorflow as tf  # type: ignore
+    Sequential = tf.keras.models.Sequential
+    Embedding = tf.keras.layers.Embedding
+    LSTM = tf.keras.layers.LSTM
+    Dense = tf.keras.layers.Dense
+    Tokenizer = tf.keras.preprocessing.text.Tokenizer
+    pad_sequences = tf.keras.preprocessing.sequence.pad_sequences
     TF_AVAILABLE = True
-except ImportError:
+except (ImportError, ModuleNotFoundError, AttributeError):
     TF_AVAILABLE = False
 
 class LSTMDetectionModel:
@@ -65,12 +67,23 @@ class LSTMDetectionModel:
             # Convert to numpy arrays
             X = np.array(padded_sequences)
             y = np.array(labels)
+            
+            # Compute balanced class weights as sample weights
+            n_samples = len(y)
+            n_hoax = sum(y)
+            n_fakta = n_samples - n_hoax
+            if n_hoax > 0 and n_fakta > 0:
+                weight_hoax = n_samples / (2.0 * n_hoax)
+                weight_fakta = n_samples / (2.0 * n_fakta)
+                sample_weights = np.array([weight_hoax if label == 1 else weight_fakta for label in y])
+            else:
+                sample_weights = np.ones(n_samples)
         
         # Build and train model
         self.model = self.build_model()
         if TF_AVAILABLE:
-            # Train for a few epochs since dataset is small (for on-the-fly MVP)
-            self.model.fit(X, y, epochs=5, verbose=0)
+            # Train with balanced sample weights
+            self.model.fit(X, y, epochs=8, verbose=0, sample_weight=sample_weights)
         self.is_trained = True
         
     def predict(self, raw_text):
@@ -90,10 +103,31 @@ class LSTMDetectionModel:
             self.train_model()
             
         if not TF_AVAILABLE:
-            # Provide mock random probabilities leaning towards text length heuristics if TF is missing
-            hoax_prob = min(max(random.gauss(0.5, 0.2), 0.1), 0.9)
-            if any(sig in clean_input for sig in HOAX_SIGNALS):
-                hoax_prob = min(hoax_prob + 0.3, 0.95)
+            # Heuristic-based mock prediction (NOT random)
+            excl_count, caps_ratio, signal_count, url_count = extract_text_features(raw_text)
+            
+            # Start with neutral probability
+            hoax_prob = 0.45
+            
+            # Boost based on hoax signals
+            if signal_count >= 3:
+                hoax_prob += 0.25
+            elif signal_count >= 2:
+                hoax_prob += 0.15
+            elif signal_count >= 1:
+                hoax_prob += 0.08
+            
+            # Boost for sensationalism indicators
+            if excl_count >= 3:
+                hoax_prob += 0.05
+            if caps_ratio > 0.3:
+                hoax_prob += 0.05
+            if url_count >= 1:
+                hoax_prob += 0.03
+            
+            # Add small randomness for variation
+            hoax_prob += random.gauss(0, 0.03)
+            hoax_prob = min(max(hoax_prob, 0.05), 0.95)
             fakta_prob = 1.0 - hoax_prob
         else:
             sequence = self.tokenizer.texts_to_sequences([clean_input])
@@ -103,23 +137,14 @@ class LSTMDetectionModel:
             hoax_prob = float(self.model.predict(padded_sequence, verbose=0)[0][0])
             fakta_prob = 1.0 - hoax_prob
         
-        if hoax_prob >= 0.53:
+        if hoax_prob >= 0.50:
             label = "BERPOTENSI HOAX"
             badge_type = "danger"
             confidence = round(hoax_prob * 100, 1)
-        elif fakta_prob >= 0.53:
+        else:
             label = "KEMUNGKINAN FAKTA"
             badge_type = "success"
             confidence = round(fakta_prob * 100, 1)
-        else:
-            if hoax_prob > fakta_prob:
-                label = "BERPOTENSI HOAX"
-                badge_type = "danger"
-                confidence = round(hoax_prob * 100, 1)
-            else:
-                label = "KEMUNGKINAN FAKTA"
-                badge_type = "success"
-                confidence = round(fakta_prob * 100, 1)
                 
         return {
             "label": label,
@@ -127,5 +152,5 @@ class LSTMDetectionModel:
             "confidence_score": confidence,
             "hoax_prob": round(hoax_prob * 100, 1),
             "fakta_prob": round(fakta_prob * 100, 1),
-            "note": "Prediksi dari model Deep Learning LSTM." if TF_AVAILABLE else "Mode Simulasi (TensorFlow tidak terinstal). Menggunakan mock LSTM."
+            "note": "Prediksi dari model Deep Learning LSTM (class_weight=balanced)." if TF_AVAILABLE else "Mode Simulasi Heuristik (TensorFlow tidak terinstal). Menggunakan analisis sinyal kata kunci."
         }

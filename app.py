@@ -13,6 +13,8 @@ from modules.nlp_engine import HoaxDetectorModel
 from modules.lstm_engine import LSTMDetectionModel
 from modules.scraper_engine import run_scraping_pipeline
 from modules.email_service import send_gmail_report, send_test_email
+from modules.llm_extractor import extract_claim_with_llm, test_llm_connection, get_llm_verdict, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL
+from modules.ensemble_engine import compute_ensemble_verdict
 import json
 
 # Page Configuration
@@ -57,7 +59,7 @@ with tab_detect:
 
     with col_input:
         st.markdown("### 📝 Input Teks Klaim atau Tautan Berita")
-        st.caption("Masukkan naskah klaim, pesan berantai WhatsApp, atau tempelkan URL tautan artikel berita untuk diperiksa.")
+        st.caption("Masukkan naskah klaim, pesan berantai WhatsApp, atau tempelkan URL tautan artikel berita untuk dianalisis.")
         
         user_input = st.text_area(
             label="Kotak Input Klaim/Tautan",
@@ -71,65 +73,203 @@ with tab_detect:
         if user_input != st.session_state.get("current_input", ""):
             st.session_state.current_input = user_input
 
-        col_btn1, col_btn2, _ = st.columns([1.5, 1, 3])
+        col_btn1, col_btn2, _ = st.columns([2, 1.2, 2])
         with col_btn1:
-            if st.button("🔍 Periksa Sekarang", type="primary", use_container_width=True):
-                st.session_state.show_results = True
-                
+            if st.button("🤖 Langkah 1: Ekstrak Klaim (OpenRouter LLM)", type="primary", use_container_width=True):
+                if not user_input.strip():
+                    st.warning("⚠️ Mohon masukkan teks klaim atau tautan berita terlebih dahulu.")
+                else:
+                    input_text = user_input.strip()
+                    is_url_input = is_valid_url(input_text)
+                    raw_text_for_llm = input_text
+
+                    if is_url_input:
+                        st.toast("🌐 Tautan berita terdeteksi! Mengekstraksi konten artikel...", icon="ℹ️")
+                        url_res = extract_content_from_url(input_text)
+                        if url_res["success"]:
+                            raw_text_for_llm = url_res["text"]
+
+                    # Load openrouter config
+                    CONFIG_PATH = os.path.join(os.path.dirname(__file__), "data", "config.json")
+                    api_key = ""
+                    model_name = DEFAULT_OPENROUTER_MODEL
+                    if os.path.exists(CONFIG_PATH):
+                        try:
+                            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                                cfg = json.load(f)
+                                api_key = cfg.get("openrouter_api_key", cfg.get("llm_api_key", ""))
+                                model_name = cfg.get("openrouter_model", DEFAULT_OPENROUTER_MODEL)
+                        except:
+                            pass
+
+                    with st.spinner("⏳ Menjalankan ekstraksi klaim abstrak via OpenRouter AI..."):
+                        llm_res = extract_claim_with_llm(raw_text_for_llm, api_key=api_key, model_name=model_name)
+                        st.session_state.llm_result = llm_res
+                        st.session_state.edited_claim = llm_res["extracted_claim"]
+                        st.session_state.show_extraction_card = True
+                        st.session_state.show_results = False
+
         with col_btn2:
-            if st.button("💡 Coba Sampel Hoax", use_container_width=True):
+            if st.button("💡 Sampel Hoax", use_container_width=True):
                 st.session_state.current_input = "Beredar pesan berantai di WhatsApp yang mengklaim bahwa memakan telur rebus pada jam 12 malam secara ajaib dapat menangkal dan menyembuhkan infeksi virus Corona."
-                st.session_state.show_results = True
+                st.session_state.show_extraction_card = False
+                st.session_state.show_results = False
                 st.rerun()
 
     with col_sidebar_info:
         st.markdown("### 📊 Ringkasan Sesi & Statistik")
-        st.info("💡 **Tips:** Sistem akan otomatis mendeteksi jika Anda memasukkan tautan URL dan mengekstraksi isi berita secara otomatis.")
+        st.info("💡 **Petunjuk Alur Kerja:**\n1. Klik **🤖 Langkah 1: Ekstrak Klaim** untuk menghasilkan 1 kalimat klaim padat.\n2. Tinjau/Edit klaim hasil AI.\n3. Klik **🔍 Langkah 2: Periksa & Verifikasi** untuk menjalankan deteksi fakta.")
         
         recent = get_recent_history(limit=5)
         st.metric(label="Total Pengecekan Riwayat", value=len(recent))
 
-    # Process Input when Action Triggered
-    if st.session_state.get("show_results", False) and st.session_state.get("current_input", "").strip():
-        input_text = st.session_state.current_input.strip()
+    # DISPLAY STEP 1: LLM CLAIM EXTRACTION REVIEW CARD
+    if st.session_state.get("show_extraction_card", False) and "llm_result" in st.session_state:
+        res = st.session_state.llm_result
+        st.markdown("---")
+        st.markdown("### 🤖 Hasil Ekstraksi Klaim Inti AI & Entitas")
+
+        if res.get("api_key_missing", False):
+            st.warning(f"""
+                {res['message']}  
+                👉 **Panduan:** Masukkan API Key OpenRouter Anda (`sk-or-v1-...`) pada **Tab ⚙️ Admin Panel Retrain** -> bagian **Pengaturan API OpenRouter LLM**.
+            """)
+        elif not res.get("is_llm", False):
+            st.info(f"ℹ️ {res['message']}")
+        else:
+            st.success(f"✅ {res['message']} (Provider: `OpenRouter`, Model: `{res.get('model_used', DEFAULT_OPENROUTER_MODEL)}`)")
+
+        col_card1, col_card2 = st.columns([1.8, 1.2])
+        with col_card1:
+            st.markdown("#### ✏️ Tinjau & Edit Kalimat Klaim Utama:")
+            edited_text = st.text_area(
+                label="Kalimat Klaim Utama (Dapat disunting):",
+                value=st.session_state.get("edited_claim", res["extracted_claim"]),
+                height=90,
+                key="edited_claim_input",
+                help="Kalimat klaim ini yang akan dikirimkan ke model klasifikasi NLP & basis data rujukan cek fakta."
+            )
+            st.session_state.edited_claim = edited_text
+
+        with col_card2:
+            st.markdown("#### 📌 Informasi Tambahan Artikel:")
+            st.write(f"**Ringkasan Teks:** {res['summary']}")
+            if res.get("key_entities"):
+                tags_html = " ".join([f'<span class="word-tag">🏷️ {e}</span>' for e in res["key_entities"]])
+                st.markdown(f"**Entitas Terdeteksi:**<br>{tags_html}", unsafe_allow_html=True)
+            st.caption(f"Tingkat Provokatif/Sensasional: **{res.get('sensational_rating', 'RENDAH')}**")
+
+        st.write("")
+        if st.button("🔍 Langkah 2: Periksa & Verifikasi Fakta Sekarang", type="primary", use_container_width=True):
+            st.session_state.show_results = True
+
+    # STEP 2: RUN VERIFICATION IF TRIGGERED
+    if st.session_state.get("show_results", False):
+        analysis_text = st.session_state.get("edited_claim", st.session_state.get("current_input", "")).strip()
+        input_text = st.session_state.get("current_input", "").strip()
         is_url_input = is_valid_url(input_text)
         
-        with st.spinner("⏳ Memproses input & mengolah fitur NLP..."):
-            extracted_title = ""
-            analysis_text = input_text
-            
-            # Step 1: Extract URL if input is URL
-            if is_url_input:
-                st.toast("🌐 Tautan berita terdeteksi! Mengekstraksi konten artikel...", icon="ℹ️")
-                url_res = extract_content_from_url(input_text)
-                if url_res["success"]:
-                    extracted_title = url_res["title"]
-                    analysis_text = url_res["text"]
-                    st.success(f"✅ **Tautan Berhasil Diekstrak:** {extracted_title}")
-                else:
-                    st.warning(f"⚠️ {url_res['error']}. Memproses URL sebagai teks biasa.")
-
-            # Step 2: NLP Model Classification
+        with st.spinner("⏳ Memproses 4 Sinyal Deteksi (NLP + LSTM + OpenRouter LLM + Cross-Checker)..."):
+            # 1. NLP Model Classification
             prediction = st.session_state.nlp_model.predict(analysis_text)
+            
+            # 2. LSTM Model Classification
             prediction_lstm = st.session_state.lstm_model.predict(analysis_text)
             
-            # Step 3: Cross-Verification Search
+            # 3. OpenRouter LLM Zero-shot Verdict (5 Categories)
+            CONFIG_PATH = os.path.join(os.path.dirname(__file__), "data", "config.json")
+            api_key = ""
+            model_name = DEFAULT_OPENROUTER_MODEL
+            if os.path.exists(CONFIG_PATH):
+                try:
+                    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        api_key = cfg.get("openrouter_api_key", cfg.get("llm_api_key", ""))
+                        model_name = cfg.get("openrouter_model", DEFAULT_OPENROUTER_MODEL)
+                except:
+                    pass
+            llm_verdict_res = get_llm_verdict(analysis_text, api_key=api_key, model_name=model_name)
+
+            # 4. Cross-Verification Search
             matches = st.session_state.cross_checker.find_matches(analysis_text)
             top_match = matches[0] if matches else None
 
-            # Step 4: Save to Database Search History
+            # 5. Compute Integrated Ensemble Verdict
+            ensemble_res = compute_ensemble_verdict(prediction, prediction_lstm, llm_verdict_res, matches)
+
+            # Save to Database Search History
             save_search_history(
-                input_text=input_text,
+                input_text=analysis_text,
                 input_type="url" if is_url_input else "text",
-                predicted_label=prediction["label"],
-                confidence_score=prediction["confidence_score"],
+                predicted_label=ensemble_res["final_label"],
+                confidence_score=ensemble_res["confidence_score"],
                 matched_reference_id=top_match["id"] if top_match else None
             )
 
         st.markdown("---")
-        st.markdown("## 🎯 Hasil Analisis Prediksi")
+        st.markdown("## 🎯 Hasil Verdict Ensemble Multi-Model")
         
-        tab_logreg, tab_lstm = st.tabs(["📊 Logistic Regression (Klasik)", "🧠 LSTM (Deep Learning)"])
+        # --- ENSEMBLE SUMMARY CARD ---
+        ens_badge_class = f"badge-{ensemble_res['badge_type']}"
+        
+        # Color & icon mapping for 5 LLM verdict categories
+        verdict_badge_colors = {
+            "BENAR": "#10b981",         # Green
+            "SEBAGIAN BENAR": "#06b6d4", # Cyan
+            "BELUM ADA BUKTI": "#64748b",# Slate Gray
+            "SESAT": "#f59e0b",          # Amber/Orange
+            "KELIRU": "#ef4444"          # Red
+        }
+        v_color = verdict_badge_colors.get(ensemble_res["llm_verdict"], "#64748b")
+        
+        col_ens1, col_ens2 = st.columns([1.3, 1.7])
+        with col_ens1:
+            st.markdown("#### Verdict Akhir Ensemble")
+            st.markdown(f'<div class="badge-result {ens_badge_class}">{ensemble_res["final_label"]}</div>', unsafe_allow_html=True)
+            st.write("")
+            st.markdown(f"**Ringkasan:** {ensemble_res['verdict_summary']}")
+            
+            # Show 5-Category LLM Verdict Badge
+            st.markdown(f"""
+                <div style="margin-top: 1rem; padding: 0.8rem; border-radius: 8px; background: rgba(0,0,0,0.04); border-left: 4px solid {v_color};">
+                    <small style="color: #64748b; font-weight: bold;">VONIS CEK FAKTA LLM:</small><br>
+                    <span style="font-size: 1.1rem; font-weight: bold; color: {v_color};">🏷️ {ensemble_res['llm_verdict']}</span><br>
+                    <small style="color: #334155;"><em>"{ensemble_res['llm_reasoning']}"</em></small>
+                </div>
+            """, unsafe_allow_html=True)
+
+        with col_ens2:
+            st.markdown("#### Indikator Risiko Hoaks (Ensemble Score)")
+            hoax_pct = ensemble_res["hoax_score_percent"]
+            st.progress(hoax_pct / 100.0)
+            
+            em1, em2, em3 = st.columns(3)
+            em1.metric("Skor Risiko Hoaks", f"{hoax_pct}%")
+            em2.metric("Tingkat Keandalan Fakta", f"{ensemble_res['fakta_score_percent']}%")
+            em3.metric("Status Vonis LLM", ensemble_res["llm_verdict"])
+
+            st.markdown("##### 🧩 Matriks Kontribusi Sinyal Ensemble:")
+            breakdown = ensemble_res["breakdown"]
+            st.markdown(f"""
+            | Sinyal Deteksi | Bobot | Hasil Prediksi Sinyal | Skor Hoaks |
+            | :--- | :---: | :--- | :---: |
+            | 📊 **NLP (Logistic Reg. + Heuristics)** | 25% | `{breakdown['nlp']['label']}` | **{breakdown['nlp']['hoax_prob']}%** |
+            | 🧠 **LSTM (Deep Learning)** | 20% | `{breakdown['lstm']['label']}` | **{breakdown['lstm']['hoax_prob']}%** |
+            | 🤖 **OpenRouter LLM (Zero-shot)** | 35% | `🏷️ {breakdown['llm']['verdict']}` | **{breakdown['llm']['hoax_prob']}%** |
+            | 🔗 **Cross-Checker (Corpus Match)** | 20% | `{breakdown['cross_checker']['top_match'][:35]}...` | **{breakdown['cross_checker']['hoax_prob']}%** |
+            """)
+
+        # EXPLAINABILITY KEYWORDS
+        if prediction.get("suspicious_words"):
+            st.markdown("##### 📌 Kata/Frasa Mencurigakan Terdeteksi (Explainability):")
+            tags_html = "".join([f'<span class="word-tag">⚠️ {word}</span>' for word in prediction["suspicious_words"]])
+            st.markdown(f'<div style="margin-bottom: 1rem;">{tags_html}</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # BREAKDOWN DETAIL TABS
+        st.markdown("### 🔍 Rincian Analisis per Sinyal")
+        tab_logreg, tab_lstm, tab_llm_detail = st.tabs(["📊 Logistic Regression (Klasik)", "🧠 LSTM (Deep Learning)", "🤖 OpenRouter LLM Analysis"])
 
         # PART (A1): LOGISTIC REGRESSION RESULTS
         with tab_logreg:
@@ -171,11 +311,10 @@ with tab_detect:
                 m5.metric("Probabilitas Hoax", f"{prediction_lstm['hoax_prob']}%")
                 m6.metric("Probabilitas Fakta", f"{prediction_lstm['fakta_prob']}%")
 
-        # PART (A-2): EXPLAINABILITY / SUSPICIOUS KEYWORDS (P1 Bonus)
-        if prediction["suspicious_words"]:
-            st.markdown("##### 📌 Kata/Frasa Mencurigakan Terdeteksi (Explainability):")
-            tags_html = "".join([f'<span class="word-tag">⚠️ {word}</span>' for word in prediction["suspicious_words"]])
-            st.markdown(f'<div style="margin-bottom: 1rem;">{tags_html}</div>', unsafe_allow_html=True)
+        # PART (A3): LLM DETAIL
+        with tab_llm_detail:
+            st.markdown(f"#### Vonis Analisis LLM (`{llm_verdict_res.get('model_used', model_name)}`)")
+            st.info(f"**Vonis Kategori:** {llm_verdict_res['verdict']}\n\n**Keyakinan Model:** {llm_verdict_res['confidence']}%\n\n**Penalaran:** {llm_verdict_res['reasoning']}")
 
         st.markdown("---")
 
@@ -194,7 +333,7 @@ with tab_detect:
                     </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("ℹ️ Tidak ditemukan klaim yang persis serupa di basis data rujukan (TurnBackHoax/Tempo/CNN). Hasil prediksi di atas murni didasarkan pada analisis model klasifikasi NLP.")
+            st.info("ℹ️ Tidak ditemukan klaim yang persis serupa di basis data rujukan (TurnBackHoax/Tempo/CNN). Hasil prediksi murni didasarkan pada analisis model klasifikasi NLP & LLM.")
 
         # PART (C): DISCLAIMER / CATATAN PENGINGAT
         st.markdown("""
@@ -203,6 +342,7 @@ with tab_detect:
                 Hasil deteksi ini merupakan alat bantu triase awal berbasis AI/NLP dan pencocokan data historis, <strong>bukan vonis mutlak final</strong>. Selalu lakukan verifikasi mandiri dan rujuk lembaga cek fakta independen (MAFINDO / Tempo / Kominfo) sebelum menyebarkan informasi.
             </div>
         """, unsafe_allow_html=True)
+
 
 
 # TAB 2: BASIS DATA RUJUKAN CEK FAKTA
@@ -309,6 +449,73 @@ with tab_admin:
             st.session_state.cross_checker.load_and_build_index()
             st.success("✅ Database berhasil dikosongkan (0 Data)!")
             st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 🤖 Pengaturan API OpenRouter LLM")
+    st.caption("Konfigurasikan OpenRouter API Key agar sistem dapat mengekstrak klaim utama dan merangkum berita secara otomatis menggunakan AI.")
+
+    # Load existing config if available
+    CONFIG_PATH = os.path.join(os.path.dirname(__file__), "data", "config.json")
+    saved_cfg = {}
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                saved_cfg = json.load(f)
+        except:
+            pass
+
+    col_llm1, col_llm2 = st.columns([1.5, 1])
+    with col_llm1:
+        existing_key = saved_cfg.get("openrouter_api_key", saved_cfg.get("llm_api_key", ""))
+        existing_model = saved_cfg.get("openrouter_model", saved_cfg.get("llm_model", DEFAULT_OPENROUTER_MODEL))
+
+        cfg_llm_key = st.text_input(
+            "OpenRouter API Key:",
+            value=existing_key,
+            type="password",
+            placeholder="sk-or-v1-...",
+            help="Dapatkan API Key gratis di https://openrouter.ai/keys"
+        )
+        cfg_llm_model = st.text_input(
+            "Nama Model OpenRouter:",
+            value=existing_model,
+            placeholder="google/gemini-2.0-flash-exp:free"
+        )
+
+        btn_save_or, btn_test_or = st.columns(2)
+        with btn_save_or:
+            if st.button("💾 Simpan Pengaturan OpenRouter", use_container_width=True):
+                saved_cfg["openrouter_api_key"] = cfg_llm_key.strip()
+                saved_cfg["llm_api_key"] = cfg_llm_key.strip()
+                saved_cfg["openrouter_model"] = cfg_llm_model.strip() if cfg_llm_model.strip() else DEFAULT_OPENROUTER_MODEL
+                saved_cfg["llm_model"] = cfg_llm_model.strip() if cfg_llm_model.strip() else DEFAULT_OPENROUTER_MODEL
+                os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+                with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                    json.dump(saved_cfg, f, indent=4)
+                st.success("✅ Pengaturan OpenRouter API Key berhasil disimpan ke config.json!")
+
+        with btn_test_or:
+            if st.button("🧪 Uji Koneksi OpenRouter API", type="primary", use_container_width=True):
+                if not cfg_llm_key.strip():
+                    st.error("⚠️ API Key OpenRouter belum diisi. Masukkan API Key terlebih dahulu.")
+                else:
+                    with st.spinner("⏳ Menghubungkan ke OpenRouter API..."):
+                        test_or_res = test_openrouter_connection(cfg_llm_key.strip(), cfg_llm_model.strip())
+                        if test_or_res["success"]:
+                            st.success(f"✅ {test_or_res['message']}")
+                        else:
+                            st.error(f"❌ {test_or_res['message']}")
+
+    with col_llm2:
+        st.markdown("#### 💡 Cara Mendapatkan API Key OpenRouter Gratis")
+        st.markdown("""
+            1. Buka situs [OpenRouter.ai Keys](https://openrouter.ai/keys).
+            2. Buat akun gratis / Sign In dengan Google/GitHub.
+            3. Klik tombol **Create Key** -> Beri nama key (misal: `VERITAS-ID`).
+            4. Salin kunci rahasia yang diawali dengan `sk-or-v1-...`.
+            5. Tempelkan pada kolom **OpenRouter API Key** di samping kiri.
+            6. Model gratis default: `google/gemini-2.0-flash-exp:free` atau `meta-llama/llama-3.3-70b-instruct:free`.
+        """)
 
     st.markdown("---")
     st.markdown("### 📧 Pengaturan Notifikasi Email Gmail (Penjadwalan Harian)")
