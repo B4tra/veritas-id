@@ -118,7 +118,6 @@ with tab_detect:
 
     with col_sidebar_info:
         st.markdown("### 📊 Ringkasan Sesi & Statistik")
-        st.info("💡 **Petunjuk Alur Kerja:**\n1. Klik **🤖 Langkah 1: Ekstrak Klaim** untuk menghasilkan 1 kalimat klaim padat.\n2. Tinjau/Edit klaim hasil AI.\n3. Klik **🔍 Langkah 2: Periksa & Verifikasi** untuk menjalankan deteksi fakta.")
         
         recent = get_recent_history(limit=5)
         st.metric(label="Total Pengecekan Riwayat", value=len(recent))
