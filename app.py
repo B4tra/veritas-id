@@ -1,3 +1,4 @@
+from modules.llm_extractor import test_openrouter_connection
 import os
 import streamlit as st
 import pandas as pd
@@ -51,14 +52,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Navigation Tabs
-tab_detect, tab_database, tab_admin, tab_about = st.tabs(["🔍 Pengecekan Klaim", "📚 Basis Data Rujukan Cek Fakta", "⚙️ Admin Panel Retrain", "ℹ️ Tentang & PRD"])
+tab_detect, tab_database, tab_admin, tab_about = st.tabs(["Pengecekan Klaim", "Basis Data Rujukan Cek Fakta", "Admin Panel Retrain", "Tentang & PRD"])
 
 # TAB 1: PENGECEKAN KLAIM (MAIN CORE FEATURE)
 with tab_detect:
     col_input, col_sidebar_info = st.columns([2, 1])
 
     with col_input:
-        st.markdown("### 📝 Input Teks Klaim atau Tautan Berita")
+        st.markdown("### Input Teks Klaim atau Tautan Berita")
         st.caption("Masukkan naskah klaim, pesan berantai WhatsApp, atau tempelkan URL tautan artikel berita untuk dianalisis.")
         
         user_input = st.text_area(
@@ -75,16 +76,16 @@ with tab_detect:
 
         col_btn1, col_btn2, _ = st.columns([2, 1.2, 2])
         with col_btn1:
-            if st.button("🤖 Langkah 1: Ekstrak Klaim (OpenRouter LLM)", type="primary", use_container_width=True):
+            if st.button("Langkah 1: Ekstrak Klaim (OpenRouter LLM)", type="primary", use_container_width=True):
                 if not user_input.strip():
-                    st.warning("⚠️ Mohon masukkan teks klaim atau tautan berita terlebih dahulu.")
+                    st.warning("Mohon masukkan teks klaim atau tautan berita terlebih dahulu.")
                 else:
                     input_text = user_input.strip()
                     is_url_input = is_valid_url(input_text)
                     raw_text_for_llm = input_text
 
                     if is_url_input:
-                        st.toast("🌐 Tautan berita terdeteksi! Mengekstraksi konten artikel...", icon="ℹ️")
+                        st.toast("Tautan berita terdeteksi! Mengekstraksi konten artikel...", icon="ℹ️")
                         url_res = extract_content_from_url(input_text)
                         if url_res["success"]:
                             raw_text_for_llm = url_res["text"]
@@ -102,7 +103,7 @@ with tab_detect:
                         except:
                             pass
 
-                    with st.spinner("⏳ Menjalankan ekstraksi klaim abstrak via OpenRouter AI..."):
+                    with st.spinner("Menjalankan ekstraksi klaim abstrak via OpenRouter AI..."):
                         llm_res = extract_claim_with_llm(raw_text_for_llm, api_key=api_key, model_name=model_name)
                         st.session_state.llm_result = llm_res
                         st.session_state.edited_claim = llm_res["extracted_claim"]
@@ -117,7 +118,7 @@ with tab_detect:
                 st.rerun()
 
     with col_sidebar_info:
-        st.markdown("### 📊 Ringkasan Sesi & Statistik")
+        st.markdown("### Ringkasan Sesi & Statistik")
         
         recent = get_recent_history(limit=5)
         st.metric(label="Total Pengecekan Riwayat", value=len(recent))
@@ -126,7 +127,7 @@ with tab_detect:
     if st.session_state.get("show_extraction_card", False) and "llm_result" in st.session_state:
         res = st.session_state.llm_result
         st.markdown("---")
-        st.markdown("### 🤖 Hasil Ekstraksi Klaim Inti AI & Entitas")
+        st.markdown("### Hasil Ekstraksi Klaim Inti AI & Entitas")
 
         if res.get("api_key_missing", False):
             st.warning(f"""
@@ -134,13 +135,13 @@ with tab_detect:
                 👉 **Panduan:** Masukkan API Key OpenRouter Anda (`sk-or-v1-...`) pada **Tab ⚙️ Admin Panel Retrain** -> bagian **Pengaturan API OpenRouter LLM**.
             """)
         elif not res.get("is_llm", False):
-            st.info(f"ℹ️ {res['message']}")
+            st.info(f"{res['message']}")
         else:
-            st.success(f"✅ {res['message']} (Provider: `OpenRouter`, Model: `{res.get('model_used', DEFAULT_OPENROUTER_MODEL)}`)")
+            st.success(f"{res['message']} (Provider: `OpenRouter`, Model: `{res.get('model_used', DEFAULT_OPENROUTER_MODEL)}`)")
 
         col_card1, col_card2 = st.columns([1.8, 1.2])
         with col_card1:
-            st.markdown("#### ✏️ Tinjau & Edit Kalimat Klaim Utama:")
+            st.markdown("#### Tinjau & Edit Kalimat Klaim Utama:")
             edited_text = st.text_area(
                 label="Kalimat Klaim Utama (Dapat disunting):",
                 value=st.session_state.get("edited_claim", res["extracted_claim"]),
@@ -151,15 +152,15 @@ with tab_detect:
             st.session_state.edited_claim = edited_text
 
         with col_card2:
-            st.markdown("#### 📌 Informasi Tambahan Artikel:")
+            st.markdown("#### Informasi Tambahan Artikel:")
             st.write(f"**Ringkasan Teks:** {res['summary']}")
             if res.get("key_entities"):
-                tags_html = " ".join([f'<span class="word-tag">🏷️ {e}</span>' for e in res["key_entities"]])
+                tags_html = " ".join([f'<span class="word-tag">{e}</span>' for e in res["key_entities"]])
                 st.markdown(f"**Entitas Terdeteksi:**<br>{tags_html}", unsafe_allow_html=True)
             st.caption(f"Tingkat Provokatif/Sensasional: **{res.get('sensational_rating', 'RENDAH')}**")
 
         st.write("")
-        if st.button("🔍 Langkah 2: Periksa & Verifikasi Fakta Sekarang", type="primary", use_container_width=True):
+        if st.button("Langkah 2: Periksa & Verifikasi Fakta Sekarang", type="primary", use_container_width=True):
             st.session_state.show_results = True
 
     # STEP 2: RUN VERIFICATION IF TRIGGERED
@@ -168,7 +169,7 @@ with tab_detect:
         input_text = st.session_state.get("current_input", "").strip()
         is_url_input = is_valid_url(input_text)
         
-        with st.spinner("⏳ Memproses 4 Sinyal Deteksi (NLP + LSTM + OpenRouter LLM + Cross-Checker)..."):
+        with st.spinner("Memproses 4 Sinyal Deteksi (NLP + LSTM + OpenRouter LLM + Cross-Checker)..."):
             # 1. NLP Model Classification
             prediction = st.session_state.nlp_model.predict(analysis_text)
             
@@ -206,7 +207,7 @@ with tab_detect:
             )
 
         st.markdown("---")
-        st.markdown("## 🎯 Hasil Verdict Ensemble Multi-Model")
+        st.markdown("## Hasil Verdict Ensemble Multi-Model")
         
         # --- ENSEMBLE SUMMARY CARD ---
         ens_badge_class = f"badge-{ensemble_res['badge_type']}"
@@ -247,28 +248,28 @@ with tab_detect:
             em2.metric("Tingkat Keandalan Fakta", f"{ensemble_res['fakta_score_percent']}%")
             em3.metric("Status Vonis LLM", ensemble_res["llm_verdict"])
 
-            st.markdown("##### 🧩 Matriks Kontribusi Sinyal Ensemble:")
+            st.markdown("##### Matriks Kontribusi Sinyal Ensemble:")
             breakdown = ensemble_res["breakdown"]
             st.markdown(f"""
             | Sinyal Deteksi | Bobot | Hasil Prediksi Sinyal | Skor Hoaks |
             | :--- | :---: | :--- | :---: |
-            | 📊 **NLP (Logistic Reg. + Heuristics)** | 25% | `{breakdown['nlp']['label']}` | **{breakdown['nlp']['hoax_prob']}%** |
-            | 🧠 **LSTM (Deep Learning)** | 20% | `{breakdown['lstm']['label']}` | **{breakdown['lstm']['hoax_prob']}%** |
-            | 🤖 **OpenRouter LLM (Zero-shot)** | 35% | `🏷️ {breakdown['llm']['verdict']}` | **{breakdown['llm']['hoax_prob']}%** |
-            | 🔗 **Cross-Checker (Corpus Match)** | 20% | `{breakdown['cross_checker']['top_match'][:35]}...` | **{breakdown['cross_checker']['hoax_prob']}%** |
+            | **NLP (Logistic Reg. + Heuristics)** | 25% | `{breakdown['nlp']['label']}` | **{breakdown['nlp']['hoax_prob']}%** |
+            | **LSTM (Deep Learning)** | 20% | `{breakdown['lstm']['label']}` | **{breakdown['lstm']['hoax_prob']}%** |
+            | **OpenRouter LLM (Zero-shot)** | 35% | ` {breakdown['llm']['verdict']}` | **{breakdown['llm']['hoax_prob']}%** |
+            | **Cross-Checker (Corpus Match)** | 20% | `{breakdown['cross_checker']['top_match'][:35]}...` | **{breakdown['cross_checker']['hoax_prob']}%** |
             """)
 
         # EXPLAINABILITY KEYWORDS
         if prediction.get("suspicious_words"):
-            st.markdown("##### 📌 Kata/Frasa Mencurigakan Terdeteksi (Explainability):")
-            tags_html = "".join([f'<span class="word-tag">⚠️ {word}</span>' for word in prediction["suspicious_words"]])
+            st.markdown("#####  Kata/Frasa Mencurigakan Terdeteksi (Explainability):")
+            tags_html = "".join([f'<span class="word-tag"> {word}</span>' for word in prediction["suspicious_words"]])
             st.markdown(f'<div style="margin-bottom: 1rem;">{tags_html}</div>', unsafe_allow_html=True)
 
         st.markdown("---")
 
         # BREAKDOWN DETAIL TABS
-        st.markdown("### 🔍 Rincian Analisis per Sinyal")
-        tab_logreg, tab_lstm, tab_llm_detail = st.tabs(["📊 Logistic Regression (Klasik)", "🧠 LSTM (Deep Learning)", "🤖 OpenRouter LLM Analysis"])
+        st.markdown("### Rincian Analisis per Sinyal")
+        tab_logreg, tab_lstm, tab_llm_detail = st.tabs(["Logistic Regression (Klasik)", "LSTM (Deep Learning)", "OpenRouter LLM Analysis"])
 
         # PART (A1): LOGISTIC REGRESSION RESULTS
         with tab_logreg:
@@ -318,7 +319,7 @@ with tab_detect:
         st.markdown("---")
 
         # PART (B): CROSS-VERIFICATION REFERENCES
-        st.markdown("## 🔗 Rujukan Verifikasi Silang Data Cek Fakta")
+        st.markdown("##Rujukan Verifikasi Silang Data Cek Fakta")
         
         if matches:
             st.success(f"Ditemukan {len(matches)} rujukan artikel cek fakta serupa dari basis data terverifikasi:")
@@ -332,7 +333,7 @@ with tab_detect:
                     </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("ℹ️ Tidak ditemukan klaim yang persis serupa di basis data rujukan (TurnBackHoax/Tempo/CNN). Hasil prediksi murni didasarkan pada analisis model klasifikasi NLP & LLM.")
+            st.info("Tidak ditemukan klaim yang persis serupa di basis data rujukan (TurnBackHoax/Tempo/CNN). Hasil prediksi murni didasarkan pada analisis model klasifikasi NLP & LLM.")
 
         # PART (C): DISCLAIMER / CATATAN PENGINGAT
         st.markdown("""
@@ -346,7 +347,7 @@ with tab_detect:
 
 # TAB 2: BASIS DATA RUJUKAN CEK FAKTA
 with tab_database:
-    st.markdown("### 📚 Korpus Multi-Sumber Cek Fakta Indonesia")
+    st.markdown("###Korpus Multi-Sumber Cek Fakta Indonesia")
     st.caption("Basis data rujukan terstruktur yang digunakan untuk verifikasi silang dan pelatihan model NLP VERITAS-ID.")
     
     col_f1, col_f2 = st.columns([1.5, 1])
@@ -354,15 +355,15 @@ with tab_database:
         filter_label = st.multiselect("Filter Kelas Label", options=["HOAX", "FAKTA"], default=["HOAX", "FAKTA"])
     with col_f2:
         sort_choice = st.selectbox("⏳ Urutkan Berdasarkan Waktu/Tanggal:", options=[
-            "🆕 Terbaru (Newest First)",
-            "📜 Terlama (Oldest First)",
-            "🔢 ID (Urutan Masuk)"
+            "Terbaru (Newest First)",
+            "Terlama (Oldest First)",
+            "ID (Urutan Masuk)"
         ])
 
     order_mapping = {
-        "🆕 Terbaru (Newest First)": "created_at DESC",
-        "📜 Terlama (Oldest First)": "created_at ASC",
-        "🔢 ID (Urutan Masuk)": "id ASC"
+        "Terbaru (Newest First)": "created_at DESC",
+        "Terlama (Oldest First)": "created_at ASC",
+        "ID (Urutan Masuk)": "id ASC"
     }
     selected_order = order_mapping.get(sort_choice, "created_at DESC")
 
@@ -411,7 +412,7 @@ with tab_admin:
     
     col_adm1, col_adm2 = st.columns([2, 1])
     with col_adm1:
-        st.markdown("#### 🔄 Kontrol Retraining Pipeline")
+        st.markdown("#### Kontrol Retraining Pipeline")
         st.write("Proses ini akan mengunduh artikel berita/hoax terbaru, memperbarui database SQLite, dan melatih ulang model secara otomatis.")
         
         limit_val = st.slider("Jumlah Artikel per Sumber untuk Diambil:", min_value=1, max_value=10, value=3)
@@ -429,7 +430,7 @@ with tab_admin:
                 st.json(scrape_res)
                 
     with col_adm2:
-        st.markdown("#### 📊 Status Database Saat Ini")
+        st.markdown("####Status Database Saat Ini")
         fact_records = fetch_all_fact_checks()
         hoax_cnt = len([r for r in fact_records if r['label'] == 'HOAX'])
         fakta_cnt = len([r for r in fact_records if r['label'] == 'FAKTA'])
@@ -498,7 +499,7 @@ with tab_admin:
                 if not cfg_llm_key.strip():
                     st.error("⚠️ API Key OpenRouter belum diisi. Masukkan API Key terlebih dahulu.")
                 else:
-                    with st.spinner("⏳ Menghubungkan ke OpenRouter API..."):
+                    with st.spinner("Menghubungkan ke OpenRouter API..."):
                         test_or_res = test_openrouter_connection(cfg_llm_key.strip(), cfg_llm_model.strip())
                         if test_or_res["success"]:
                             st.success(f"✅ {test_or_res['message']}")
@@ -517,7 +518,7 @@ with tab_admin:
         """)
 
     st.markdown("---")
-    st.markdown("### 📧 Pengaturan Notifikasi Email Gmail (Penjadwalan Harian)")
+    st.markdown("###Pengaturan Notifikasi Email Gmail (Penjadwalan Harian)")
     st.caption("Konfigurasikan Gmail agar sistem mengirimkan laporan ringkasan berita & hoax otomatis setiap hari ke inbox Anda.")
     
     # Load existing config if available
@@ -547,14 +548,14 @@ with tab_admin:
                 os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
                 with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                     json.dump(new_cfg, f, indent=4)
-                st.success("✅ Pengaturan email berhasil disimpan ke config.json!")
+                st.success("Pengaturan email berhasil disimpan ke config.json!")
 
         with btn_test_cfg:
-            if st.button("📩 Uji Coba Kirim Email Sekarang", type="primary", use_container_width=True):
+            if st.button("Uji Coba Kirim Email Sekarang", type="primary", use_container_width=True):
                 if not cfg_sender or not cfg_app_pass or not cfg_recipient:
-                    st.error("⚠️ Mohon lengkapi ketiga kolom email & App Password di atas terlebih dahulu.")
+                    st.error("Mohon lengkapi ketiga kolom email & App Password di atas terlebih dahulu.")
                 else:
-                    with st.spinner("⏳ Menghubungkan ke server Gmail SMTP dan mengirimkan email uji coba..."):
+                    with st.spinner("Menghubungkan ke server Gmail SMTP dan mengirimkan email uji coba..."):
                         import importlib
                         import modules.email_service
                         importlib.reload(modules.email_service)
@@ -565,7 +566,7 @@ with tab_admin:
                             st.error(f"❌ {test_res['message']}")
 
     with col_mail2:
-        st.markdown("#### ⏰ Cara Mengaktifkan Penjadwalan Otomatis (Windows)")
+        st.markdown("#### Cara Mengaktifkan Penjadwalan Otomatis (Windows)")
         st.markdown("""
             Agar skrip berjalan otomatis **setiap pukul 08:00 WIB**:
             1. Buka **Windows Task Scheduler** di PC Anda.
@@ -580,7 +581,7 @@ with tab_admin:
 # TAB 3: TENTANG & PRD
 with tab_about:
     st.markdown("""
-        ### 📄 PRD VERITAS-ID
+        ### PRD VERITAS-ID
         **Status:** Draft v1.0 (Dikembangkan untuk GEMASTIK XIX 2026 Divisi Penambangan Data)
         
         #### Target Pengguna:
@@ -596,7 +597,7 @@ with tab_about:
 
 # SIDEBAR: RIWAYAT PENCARIAN SESI (P1 Feature)
 with st.sidebar:
-    st.markdown("### 📜 Riwayat Pengecekan Sesi")
+    st.markdown("###Riwayat Pengecekan Sesi")
     history_items = get_recent_history(limit=8)
     if history_items:
         for item in history_items:
