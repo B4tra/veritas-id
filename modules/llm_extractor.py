@@ -3,10 +3,18 @@ import re
 import json
 import requests
 
-DEFAULT_MODEL = "google/gemma-4-31b-it:free"
+DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 DEFAULT_OPENROUTER_MODEL = DEFAULT_MODEL
 DEFAULT_GEMINI_MODEL = DEFAULT_MODEL
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+FREE_MODEL_FALLBACKS = [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "google/gemma-4-31b-it:free"
+]
 
 def sanitize_api_key(api_key):
     """Clean and normalize OpenRouter API key input."""
@@ -79,7 +87,7 @@ def fallback_heuristic_extraction(text, is_url_text=False):
 def extract_claim_with_llm(raw_text, api_key=None, model_name=DEFAULT_MODEL, provider="openrouter"):
     """
     Extract single core claim statement, key entities, and summary using OpenRouter LLM.
-    Falls back to heuristic extraction if OpenRouter API Key is missing or request fails.
+    Includes automatic model fallback if rate-limited (HTTP 429).
     """
     clean_input = raw_text.strip()
     if not clean_input:
@@ -101,7 +109,8 @@ def extract_claim_with_llm(raw_text, api_key=None, model_name=DEFAULT_MODEL, pro
         res["message"] = "⚠️ API Key OpenRouter belum diatur. Menampilkan ekstraksi heuristik lokal. Silakan atur OpenRouter API Key di Admin Panel."
         return res
 
-    model_to_use = model_name.strip() if model_name and model_name.strip() else DEFAULT_MODEL
+    preferred_model = model_name.strip() if model_name and model_name.strip() else DEFAULT_MODEL
+    candidate_models = [preferred_model] + [m for m in FREE_MODEL_FALLBACKS if m != preferred_model]
 
     headers = {
         "Authorization": f"Bearer {clean_key}",
@@ -123,52 +132,54 @@ PENTING: Kembalikan HANYA format JSON valid tanpa format markdown ```json ... ``
 
     user_prompt = f"Ekstrak klaim utama dan analisis teks berikut:\n\n{clean_input[:3500]}"
 
-    payload = {
-        "model": model_to_use,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": 0.2
-    }
+    last_error = ""
+    for model_to_use in candidate_models:
+        payload = {
+            "model": model_to_use,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.2
+        }
 
-    try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=12)
-        if response.status_code == 200:
-            res_data = response.json()
-            choices = res_data.get("choices", [])
-            if choices and "message" in choices[0]:
-                content = choices[0]["message"].get("content", "").strip()
-                content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-                content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE).strip()
+        try:
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=12)
+            if response.status_code == 200:
+                res_data = response.json()
+                choices = res_data.get("choices", [])
+                if choices and "message" in choices[0]:
+                    content = choices[0]["message"].get("content", "").strip()
+                    content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE).strip()
 
-                try:
-                    parsed_json = json.loads(content)
-                    return {
-                        "success": True,
-                        "is_llm": True,
-                        "provider": "OpenRouter",
-                        "extracted_claim": parsed_json.get("extracted_claim", clean_input[:150]),
-                        "key_entities": parsed_json.get("key_entities", []),
-                        "summary": parsed_json.get("summary", clean_input[:300]),
-                        "sensational_rating": parsed_json.get("sensational_rating", "SEDANG"),
-                        "model_used": model_to_use,
-                        "message": "✅ Ekstraksi klaim berbasis OpenRouter LLM berhasil diproses!"
-                    }
-                except json.JSONDecodeError:
-                    res = fallback_heuristic_extraction(clean_input)
-                    res["message"] = "⚠️ Respon OpenRouter tidak berformat JSON valid. Menggunakan ekstraksi heuristik."
-                    return res
-        else:
-            err_msg = f"HTTP Error {response.status_code}: {response.text[:200]}"
-            res = fallback_heuristic_extraction(clean_input)
-            res["message"] = f"⚠️ Gagal menghubungkan ke OpenRouter ({err_msg}). Menggunakan ekstraksi heuristik lokal."
-            return res
+                    try:
+                        parsed_json = json.loads(content)
+                        return {
+                            "success": True,
+                            "is_llm": True,
+                            "provider": "OpenRouter",
+                            "extracted_claim": parsed_json.get("extracted_claim", clean_input[:150]),
+                            "key_entities": parsed_json.get("key_entities", []),
+                            "summary": parsed_json.get("summary", clean_input[:300]),
+                            "sensational_rating": parsed_json.get("sensational_rating", "SEDANG"),
+                            "model_used": model_to_use,
+                            "message": f"✅ Ekstraksi klaim berhasil! (Model: {model_to_use})"
+                        }
+                    except json.JSONDecodeError:
+                        last_error = "Respon tidak berformat JSON valid"
+            else:
+                last_error = f"HTTP {response.status_code}"
+                # If rate-limited (429) or not found (404), loop to try next model in candidate_models
+                continue
 
-    except Exception as e:
-        res = fallback_heuristic_extraction(clean_input)
-        res["message"] = f"⚠️ Koneksi ke OpenRouter gagal ({str(e)}). Menggunakan ekstraksi heuristik lokal."
-        return res
+        except Exception as e:
+            last_error = str(e)
+            continue
+
+    res = fallback_heuristic_extraction(clean_input)
+    res["message"] = f"⚠️ OpenRouter rate-limited / offline ({last_error}). Menggunakan ekstraksi heuristik lokal."
+    return res
 
 def test_openrouter_connection(api_key, model_name=DEFAULT_MODEL):
     """Test function to verify OpenRouter API Key and model availability."""
@@ -249,7 +260,8 @@ def get_llm_verdict(raw_text, api_key=None, model_name=DEFAULT_MODEL):
             "message": "Menggunakan vonis heuristik lokal (API key tidak diisi)."
         }
 
-    model_to_use = model_name.strip() if model_name and model_name.strip() else DEFAULT_MODEL
+    preferred_model = model_name.strip() if model_name and model_name.strip() else DEFAULT_MODEL
+    candidate_models = [preferred_model] + [m for m in FREE_MODEL_FALLBACKS if m != preferred_model]
 
     headers = {
         "Authorization": f"Bearer {clean_key}",
@@ -277,63 +289,61 @@ Kembalikan HANYA format JSON valid tanpa format markdown ```json ... ``` dan tan
 
     user_prompt = f"Evaluasi dan berikan vonis fakta untuk teks berikut:\n\n{clean_input[:3000]}"
 
-    payload = {
-        "model": model_to_use,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": 0.1
+    last_err = ""
+    for model_to_use in candidate_models:
+        payload = {
+            "model": model_to_use,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.1
+        }
+
+        try:
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=12)
+            if response.status_code == 200:
+                res_data = response.json()
+                choices = res_data.get("choices", [])
+                if choices and "message" in choices[0]:
+                    content = choices[0]["message"].get("content", "").strip()
+                    content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE).strip()
+
+                    try:
+                        parsed = json.loads(content)
+                        v = parsed.get("verdict", "BELUM ADA BUKTI").upper()
+                        if v not in ["BENAR", "SEBAGIAN BENAR", "BELUM ADA BUKTI", "SESAT", "KELIRU"]:
+                            v = "BELUM ADA BUKTI"
+
+                        return {
+                            "success": True,
+                            "verdict": v,
+                            "confidence": float(parsed.get("confidence", 75.0)),
+                            "hoax_probability": float(parsed.get("hoax_probability", 50.0)),
+                            "reasoning": parsed.get("reasoning", "Vonis fakta dihasilkan oleh analisis AI."),
+                            "is_llm": True,
+                            "model_used": model_to_use,
+                            "message": f"✅ Vonis LLM berhasil diproses! ({model_to_use})"
+                        }
+                    except json.JSONDecodeError:
+                        last_err = "JSON Decode error"
+            else:
+                last_err = f"HTTP {response.status_code}"
+                continue
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    # Fallback heuristic if all models fail
+    return {
+        "success": True,
+        "verdict": "BELUM ADA BUKTI",
+        "confidence": 50.0,
+        "hoax_probability": 50.0,
+        "reasoning": f"Seluruh model LLM rate-limited / offline ({last_err}). Menggunakan vonis netral.",
+        "is_llm": False
     }
-
-    try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=12)
-        if response.status_code == 200:
-            res_data = response.json()
-            choices = res_data.get("choices", [])
-            if choices and "message" in choices[0]:
-                content = choices[0]["message"].get("content", "").strip()
-                content = re.sub(r'^```json\s*', '', content, flags=re.MULTILINE)
-                content = re.sub(r'^```\s*', '', content, flags=re.MULTILINE).strip()
-
-                try:
-                    parsed = json.loads(content)
-                    v = parsed.get("verdict", "BELUM ADA BUKTI").upper()
-                    if v not in ["BENAR", "SEBAGIAN BENAR", "BELUM ADA BUKTI", "SESAT", "KELIRU"]:
-                        v = "BELUM ADA BUKTI"
-
-                    return {
-                        "success": True,
-                        "verdict": v,
-                        "confidence": float(parsed.get("confidence", 75.0)),
-                        "hoax_probability": float(parsed.get("hoax_probability", 50.0)),
-                        "reasoning": parsed.get("reasoning", "Vonis fakta dihasilkan oleh analisis AI."),
-                        "is_llm": True,
-                        "model_used": model_to_use,
-                        "message": "✅ Vonis LLM berhasil diproses!"
-                    }
-                except json.JSONDecodeError:
-                    pass
-
-        # Fallback
-        return {
-            "success": True,
-            "verdict": "BELUM ADA BUKTI",
-            "confidence": 50.0,
-            "hoax_probability": 50.0,
-            "reasoning": "Respon OpenRouter tidak berformat JSON valid. Menggunakan vonis netral.",
-            "is_llm": False
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "verdict": "BELUM ADA BUKTI",
-            "confidence": 50.0,
-            "hoax_probability": 50.0,
-            "reasoning": f"Koneksi LLM terputus: {str(e)}",
-            "is_llm": False
-        }
 
 # Aliases for compatibility
 test_llm_connection = test_openrouter_connection

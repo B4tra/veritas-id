@@ -3,5 +3,5 @@
     "app_password": "genf iuln qidw hjav",
     "recipient_email": "Pupaa899@gmail.com",
     "openrouter_api_key": "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",
-    "openrouter_model": "google/gemma-4-31b-it:free"
+    "openrouter_model": "nvidia/nemotron-3-super-120b-a12b:free"
 }
