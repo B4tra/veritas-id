@@ -146,13 +146,17 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
         msg.attach(MIMEText(html_body, "html"))
         
         # Connect to Gmail SMTP Server via TLS
+        clean_app_pass = app_password.replace(" ", "").replace("\n", "").replace("\r", "").strip()
+        clean_sender = sender_email.strip()
+        clean_recipient = recipient_email.strip()
+
         server = smtplib.SMTP("smtp.gmail.com", 587, timeout=15)
         server.starttls()
-        server.login(sender_email.strip(), app_password.strip())
-        server.sendmail(sender_email.strip(), recipient_email.strip(), msg.as_string())
+        server.login(clean_sender, clean_app_pass)
+        server.sendmail(clean_sender, clean_recipient, msg.as_string())
         server.quit()
         
-        return {"success": True, "message": f"Email laporan berhasil dikirim ke {recipient_email}!"}
+        return {"success": True, "message": f"Email laporan berhasil dikirim ke {clean_recipient}!"}
         
     except Exception as e:
         return {"success": False, "message": f"Gagal mengirim email: {str(e)}"}

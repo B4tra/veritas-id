@@ -68,10 +68,15 @@ def run_daily_job():
             log_message(f"Mengirimkan laporan email ke {recipient}...")
             email_res = send_gmail_report(sender, app_pass, recipient, scrape_res)
             log_message(f"Status Pengiriman Email: {email_res['message']}")
+            if not email_res.get("success"):
+                log_message(f"❌ GAGAL MENGIRIM EMAIL: {email_res.get('message')}")
+                sys.exit(1)
         except Exception as e:
-            log_message(f"ERROR saat mengirim email: {e}")
+            log_message(f"❌ ERROR saat mengirim email: {e}")
+            sys.exit(1)
     else:
-        log_message("Kredensial email belum ditemukan (ENV atau config.json). Melewati pengiriman email notification.")
+        log_message("❌ Kredensial email (SENDER_EMAIL, APP_PASSWORD, RECIPIENT_EMAIL) belum ditemukan atau belum lengkap! Menghentikan skrip.")
+        sys.exit(1)
         
     log_message("=== Penjadwalan Harian Selesai ===")
 
