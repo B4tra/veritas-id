@@ -1,3 +1,7 @@
+# Modul web scraping untuk mengambil artikel berita dari 3 sumber:
+# - TurnBackHoax.id untuk artikel berlabel HOAX
+# - CNN Indonesia untuk artikel berlabel FAKTA
+# - ANTARA News untuk artikel berlabel FAKTA
 import requests
 from bs4 import BeautifulSoup
 import sqlite3
@@ -6,6 +10,7 @@ import os
 import time
 import urllib3
 
+# Nonaktifkan peringatan sertifikat SSL yang tidak aman
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fact_check.db")
@@ -15,6 +20,7 @@ HEADERS = {
     "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
+# Fungsi untuk membersihkan teks dari tag HTML dan spasi berlebih
 def clean_text(text):
     if not text:
         return ""
@@ -22,6 +28,7 @@ def clean_text(text):
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
+# Fungsi scraper untuk mengambil artikel HOAX dari TurnBackHoax.id
 def scrape_turnbackhoax(limit=5):
     """Scrape real live hoax articles from TurnBackHoax.id"""
     items = []
@@ -76,6 +83,7 @@ def scrape_turnbackhoax(limit=5):
         print(f"[Scraper Error] TurnBackHoax: {e}")
     return items
 
+# Fungsi scraper untuk mengambil artikel FAKTA dari CNN Indonesia
 def scrape_cnn_indonesia(limit=5):
     """Scrape real live verified news articles from CNN Indonesia"""
     items = []
@@ -120,6 +128,7 @@ def scrape_cnn_indonesia(limit=5):
         print(f"[Scraper Error] CNN Indonesia: {e}")
     return items
 
+# Fungsi scraper untuk mengambil artikel FAKTA dari ANTARA News
 def scrape_antara_news(limit=5):
     """Scrape real live verified news articles from LKBN ANTARA News"""
     items = []
@@ -163,6 +172,7 @@ def scrape_antara_news(limit=5):
         print(f"[Scraper Error] ANTARA: {e}")
     return items
 
+# Pipeline utama untuk menjalankan seluruh proses web scraping
 def run_scraping_pipeline(limit_per_source=5):
     """
     Execute full scraping pipeline for TurnBackHoax (HOAX), CNN Indonesia (FAKTA), and ANTARA News (FAKTA).
@@ -181,7 +191,8 @@ def run_scraping_pipeline(limit_per_source=5):
     inserted_count = 0
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
     for item in all_new_items:
-        cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE title = ? OR claim = ?", (item["title"], item["claim"]))
+        # Logika deduplikasi: mengecek apakah artikel dengan judul, klaim, atau URL yang sama sudah ada di database
+        cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE title = ? OR claim = ? OR (source_url IS NOT NULL AND source_url != '' AND source_url = ?)", (item["title"], item["claim"], item["source_url"]))
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
                 INSERT INTO fact_checks (title, claim, content, label, category, source_name, source_url, verdict_details, published_at, created_at)

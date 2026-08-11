@@ -1,3 +1,5 @@
+# Modul data seed (data awal) yang berisi contoh-contoh hoax terverifikasi dari berbagai kategori 
+# Modul ini digunakan untuk mengisi database pertama kali ketika aplikasi baru dijalankan
 import sqlite3
 import json
 import os
@@ -5,6 +7,7 @@ import time
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fact_check.db")
 
+# Kategori data: berisi berbagai sampel hoax dalam topik kesehatan, penipuan online, politik & sosial, bencana & cuaca, serta makanan
 SEED_DATA = [
     # --- HOAX KESEHATAN ---
     {
@@ -163,6 +166,7 @@ SEED_DATA = [
     }
 ]
 
+# Fungsi untuk menginisialisasi database SQLite dan membuat tabel jika belum ada
 def init_database(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -215,6 +219,7 @@ def init_database(db_path):
     
     conn.close()
 
+# Fungsi untuk memasukkan data seed awal (contoh hoax) ke dalam database secara otomatis
 def insert_seed_data(db_path, conn=None):
     """Insert manual seed HOAX data into the database if not already present."""
     close_conn = False

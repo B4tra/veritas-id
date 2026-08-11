@@ -1,3 +1,5 @@
+# Modul ini berfungsi untuk integrasi OpenRouter API dalam melakukan ekstraksi klaim berita
+# dan fact-checking (cek fakta) menggunakan model AI (LLM).
 import os
 import re
 import json
@@ -16,6 +18,7 @@ FREE_MODEL_FALLBACKS = [
     "google/gemma-4-31b-it:free"
 ]
 
+# Membersihkan dan menormalkan input API key OpenRouter untuk menghindari format yang salah.
 def sanitize_api_key(api_key):
     """Clean and normalize OpenRouter API key input."""
     if not api_key:
@@ -28,6 +31,8 @@ def sanitize_api_key(api_key):
         key = key[7:].strip()
     return key.strip('"\'')
 
+# Menggunakan ekstraksi klaim secara heuristik menggunakan NLP dan regex 
+# sebagai fallback ketika layanan LLM OpenRouter tidak tersedia.
 def fallback_heuristic_extraction(text, is_url_text=False):
     """
     Fallback claim sentence extractor using NLP heuristics & regex when OpenRouter LLM is unavailable.
@@ -84,6 +89,8 @@ def fallback_heuristic_extraction(text, is_url_text=False):
         "message": "Menggunakan ekstraksi heuristik lokal (OpenRouter API Key belum dikonfigurasi/offline)."
     }
 
+# Ekstraksi pernyataan klaim utama, entitas kunci, dan ringkasan menggunakan model LLM OpenRouter.
+# Terdapat mekanisme fallback model otomatis jika model utama terkena rate limit (HTTP 429).
 def extract_claim_with_llm(raw_text, api_key=None, model_name=DEFAULT_MODEL, provider="openrouter"):
     """
     Extract single core claim statement, key entities, and summary using OpenRouter LLM.
@@ -170,6 +177,8 @@ PENTING: Kembalikan HANYA format JSON valid tanpa format markdown ```json ... ``
                         last_error = "Respon tidak berformat JSON valid"
             else:
                 last_error = f"HTTP {response.status_code}"
+                # Jika terkena rate limit (429) atau model tidak ditemukan (404), 
+                # lakukan perulangan untuk mencoba model berikutnya (fallback mechanism).
                 # If rate-limited (429) or not found (404), loop to try next model in candidate_models
                 continue
 
@@ -181,6 +190,7 @@ PENTING: Kembalikan HANYA format JSON valid tanpa format markdown ```json ... ``
     res["message"] = f"⚠️ OpenRouter rate-limited / offline ({last_error}). Menggunakan ekstraksi heuristik lokal."
     return res
 
+# Fungsi uji coba untuk memverifikasi koneksi ke OpenRouter API dan ketersediaan model AI.
 def test_openrouter_connection(api_key, model_name=DEFAULT_MODEL):
     """Test function to verify OpenRouter API Key and model availability."""
     clean_key = sanitize_api_key(api_key)
@@ -208,6 +218,8 @@ def test_openrouter_connection(api_key, model_name=DEFAULT_MODEL):
     except Exception as e:
         return {"success": False, "message": f"Gagal terhubung ke OpenRouter API: {str(e)}"}
 
+# Menghasilkan vonis cek fakta dari LLM berdasarkan 5 kategori vonis:
+# BENAR, SEBAGIAN BENAR, BELUM ADA BUKTI, SESAT, dan KELIRU.
 def get_llm_verdict(raw_text, api_key=None, model_name=DEFAULT_MODEL):
     """
     Get zero-shot LLM fact-checking verdict for raw_text based on 5 standard fact-checking categories:

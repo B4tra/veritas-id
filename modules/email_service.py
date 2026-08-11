@@ -1,8 +1,10 @@
+# Modul layanan email SMTP Gmail untuk mengirim laporan harian hasil web scraping dan test email
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import time
 
+# Fungsi utama untuk mengirim laporan harian melalui email
 def send_gmail_report(sender_email, app_password, recipient_email, report_data):
     """
     Send an HTML formatted daily report email via Gmail SMTP.
@@ -52,6 +54,7 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
         else:
             items_html = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096; background: #f7fafc;">Semua berita terkini sudah up-to-date. Tidak ada artikel duplikat baru yang ditambahkan pada pemutakhiran ini.</td></tr>'
 
+        # Template HTML untuk format email laporan yang rapi dan terstruktur
         html_body = f"""
         <!DOCTYPE html>
         <html>
@@ -145,7 +148,7 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
         
         msg.attach(MIMEText(html_body, "html"))
         
-        # Connect to Gmail SMTP Server via TLS
+        # Koneksi SMTP ke server Gmail dengan menggunakan TLS dan App Password
         clean_app_pass = app_password.replace(" ", "").replace("\n", "").replace("\r", "").strip()
         clean_sender = sender_email.strip()
         clean_recipient = recipient_email.strip()
@@ -161,6 +164,7 @@ def send_gmail_report(sender_email, app_password, recipient_email, report_data):
     except Exception as e:
         return {"success": False, "message": f"Gagal mengirim email: {str(e)}"}
 
+# Fungsi untuk mengirim email uji coba memastikan konfigurasi SMTP valid
 def send_test_email(sender_email, app_password, recipient_email):
     """Send a test email using real live database stats and recent sample articles."""
     try:

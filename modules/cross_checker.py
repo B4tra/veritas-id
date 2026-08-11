@@ -1,9 +1,12 @@
+# Modul verifikasi silang (cross-check) klaim menggunakan algoritma TF-IDF Cosine Similarity 
+# terhadap korpus database lokal, dengan mekanisme fallback ke Google Fact Check API.
 import numpy as np
 import requests
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from modules.database import fetch_all_fact_checks
 
+# Kelas utama untuk menangani pencarian kemiripan teks dengan database fakta.
 class CrossChecker:
     def __init__(self):
         self.fact_checks = []
@@ -11,6 +14,7 @@ class CrossChecker:
         self.tfidf_matrix = None
         self.load_and_build_index()
 
+    # Memuat data dari database dan membangun matriks vektor TF-IDF untuk perhitungan similarity.
     def load_and_build_index(self):
         """Fetch all fact check records and compute TF-IDF vector matrix."""
         self.fact_checks = fetch_all_fact_checks()
@@ -26,6 +30,7 @@ class CrossChecker:
         self.vectorizer = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
         self.tfidf_matrix = self.vectorizer.fit_transform(corpus)
 
+    # Melakukan query fallback ke Google Fact Check API jika tidak ada kecocokan yang kuat.
     def query_google_factcheck_api(self, query_text, top_k=2):
         """Fallback query to Google Fact Check Tools REST API."""
         live_matches = []
@@ -71,6 +76,8 @@ class CrossChecker:
             print(f"[Google FactCheck API Error]: {e}")
         return live_matches
 
+    # Mencari kecocokan teks klaim menggunakan TF-IDF Cosine Similarity.
+    # Jika kemiripan (similarity) sangat rendah, sistem akan fallback menggunakan Google Fact Check API.
     def find_matches(self, query_text, threshold=0.15, top_k=3):
         """
         Match input query text against fact check corpus using TF-IDF Cosine Similarity.
@@ -93,6 +100,7 @@ class CrossChecker:
                     record["is_live_api"] = False
                     matches.append(record)
 
+        # Mekanisme fallback ke Google Fact Check API apabila nilai similarity tertinggi terlalu rendah (< 25%)
         # Fallback to Google Fact Check API if top match similarity is low (< 25%)
         if not matches or (matches and matches[0]["similarity_score"] < 25.0):
             api_results = self.query_google_factcheck_api(query_text, top_k=2)

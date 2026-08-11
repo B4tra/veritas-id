@@ -1,3 +1,6 @@
+# Modul ensemble voting ini digunakan untuk menggabungkan 4 sinyal deteksi:
+# NLP (25%), LSTM (20%), LLM (35%), dan Cross-Checker (20%).
+# Skor gabungan akan menentukan hasil akhir klasifikasi (hoaks atau bukan).
 """
 Ensemble Voting Engine for VERITAS-ID
 Combines 4 detection signals into a unified final verdict & confidence score:
@@ -7,6 +10,7 @@ Combines 4 detection signals into a unified final verdict & confidence score:
 4. Cross-Checker Similarity (Verified Fact Check Corpus) - Weight: 20%
 """
 
+# Menghitung skor ensemble berdasarkan hasil prediksi 4 model yang berbeda
 def compute_ensemble_verdict(nlp_res, lstm_res, llm_verdict_res, cross_matches):
     """
     Computes an integrated ensemble verdict score and final label.
@@ -27,6 +31,7 @@ def compute_ensemble_verdict(nlp_res, lstm_res, llm_verdict_res, cross_matches):
     if top_match:
         sim = top_match.get("similarity_score", 0.0)
         label = top_match.get("label", "")
+        # Logika penyesuaian skor berdasarkan kesamaan referensi dengan database cek fakta
         if label == "HOAX":
             # High similarity to a known HOAX article -> High Hoax score
             cross_hoax_prob = min(50.0 + (sim * 0.5), 98.0)
@@ -35,12 +40,14 @@ def compute_ensemble_verdict(nlp_res, lstm_res, llm_verdict_res, cross_matches):
             cross_hoax_prob = max(50.0 - (sim * 0.5), 5.0)
 
     # Weights
+    # Bobot penilaian untuk setiap model pendeteksi
     w_nlp = 0.25
     w_lstm = 0.20
     w_llm = 0.35
     w_cross = 0.20
 
     # Ensemble Hoax Score Calculation (0 - 100%)
+    # Perhitungan total skor hoaks dengan mengalikan probabilitas dan bobot tiap model
     ensemble_hoax_score = (
         (nlp_hoax_prob * w_nlp) +
         (lstm_hoax_prob * w_lstm) +
@@ -52,6 +59,7 @@ def compute_ensemble_verdict(nlp_res, lstm_res, llm_verdict_res, cross_matches):
     fakta_score = round(100.0 - ensemble_hoax_score, 1)
 
     # Determine final verdict category and badge
+    # Menentukan label klasifikasi akhir berdasarkan threshold dari skor ensemble
     if ensemble_hoax_score >= 58.0:
         final_label = "BERPOTENSI HOAX"
         badge_type = "danger"

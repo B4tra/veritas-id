@@ -31,3 +31,11 @@ jobs:
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
         run: |
           python daily_scheduler.py
+
+      - name: Commit and Push Updated Database
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add data/fact_check.db
+          git diff --quiet && git diff --staged --quiet || (git commit -m "auto: Update fact_check.db from daily cloud crawler [skip ci]" && git push)
+

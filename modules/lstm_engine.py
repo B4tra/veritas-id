@@ -1,3 +1,6 @@
+# Modul ini merupakan mesin klasifikasi teks berbasis Deep Learning menggunakan arsitektur LSTM.
+# Model ini dirancang untuk mempelajari konteks dan urutan kata dalam mendeteksi pola hoax.
+# Jika TensorFlow tidak tersedia, modul ini otomatis melakukan fallback ke analisis heuristik teks.
 import numpy as np
 import random
 from modules.database import fetch_all_fact_checks
@@ -15,6 +18,7 @@ try:
 except (ImportError, ModuleNotFoundError, AttributeError):
     TF_AVAILABLE = False
 
+# Kelas utama untuk mengelola siklus hidup model LSTM dalam mendeteksi hoax
 class LSTMDetectionModel:
     def __init__(self, vocab_size=5000, max_length=100, embedding_dim=32, lstm_units=32):
         self.vocab_size = vocab_size
@@ -28,9 +32,11 @@ class LSTMDetectionModel:
         
         self.train_model()
         
+    # Fungsi untuk menyusun arsitektur model (Embedding -> LSTM -> Dense)
     def build_model(self):
         if not TF_AVAILABLE:
             return None
+        # Membangun lapisan neural network untuk memproses teks secara sekuensial
         model = Sequential([
             Embedding(input_dim=self.vocab_size, output_dim=self.embedding_dim, input_length=self.max_length),
             LSTM(self.lstm_units, return_sequences=False),
@@ -40,6 +46,7 @@ class LSTMDetectionModel:
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
         return model
         
+    # Fungsi untuk memproses data dari database dan melatih model LSTM
     def train_model(self):
         records = fetch_all_fact_checks()
         if not records:
@@ -47,6 +54,7 @@ class LSTMDetectionModel:
             
         texts = []
         labels = []
+        # Menyiapkan teks masukan beserta label target yang sesuai
         for r in records:
             clean_t = preprocess_text(f"{r['title']} {r['claim']} {r['content']}")
             texts.append(clean_t)
@@ -57,6 +65,7 @@ class LSTMDetectionModel:
             return
             
         if TF_AVAILABLE:
+            # Mengonversi kumpulan teks menjadi representasi sekuens angka
             # Fit tokenizer
             self.tokenizer.fit_on_texts(texts)
             
@@ -68,6 +77,7 @@ class LSTMDetectionModel:
             X = np.array(padded_sequences)
             y = np.array(labels)
             
+            # Menghitung bobot kelas seimbang agar model tidak bias pada label yang lebih banyak
             # Compute balanced class weights as sample weights
             n_samples = len(y)
             n_hoax = sum(y)
@@ -82,13 +92,16 @@ class LSTMDetectionModel:
         # Build and train model
         self.model = self.build_model()
         if TF_AVAILABLE:
+            # Melatih model dengan mempertimbangkan bobot kelas sampel (balanced class weights)
             # Train with balanced sample weights
             self.model.fit(X, y, epochs=8, verbose=0, sample_weight=sample_weights)
         self.is_trained = True
         
+    # Fungsi untuk melakukan prediksi terhadap input teks terbaru
     def predict(self, raw_text):
         clean_input = preprocess_text(raw_text)
         
+        # Mengecek apakah teks memiliki jumlah kata yang cukup untuk diproses model
         if len(clean_input.split()) < 3:
             return {
                 "label": "TIDAK CUKUP DATA",
@@ -103,12 +116,15 @@ class LSTMDetectionModel:
             self.train_model()
             
         if not TF_AVAILABLE:
+            # Fallback (skenario pengganti) dengan menggunakan heuristik saat TensorFlow tidak terinstal
             # Heuristic-based mock prediction (NOT random)
             excl_count, caps_ratio, signal_count, url_count = extract_text_features(raw_text)
             
+            # Memulai perhitungan probabilitas dari tingkat menengah (netral)
             # Start with neutral probability
             hoax_prob = 0.45
             
+            # Menambahkan probabilitas berdasarkan temuan kata-kata sinyal hoax
             # Boost based on hoax signals
             if signal_count >= 3:
                 hoax_prob += 0.25
@@ -117,6 +133,7 @@ class LSTMDetectionModel:
             elif signal_count >= 1:
                 hoax_prob += 0.08
             
+            # Menambahkan probabilitas berdasarkan indikator gaya tulisan sensasional
             # Boost for sensationalism indicators
             if excl_count >= 3:
                 hoax_prob += 0.05
@@ -130,6 +147,7 @@ class LSTMDetectionModel:
             hoax_prob = min(max(hoax_prob, 0.05), 0.95)
             fakta_prob = 1.0 - hoax_prob
         else:
+            # Melakukan prediksi menggunakan model LSTM yang telah dilatih
             sequence = self.tokenizer.texts_to_sequences([clean_input])
             padded_sequence = pad_sequences(sequence, maxlen=self.max_length, padding='post', truncating='post')
             
@@ -137,6 +155,7 @@ class LSTMDetectionModel:
             hoax_prob = float(self.model.predict(padded_sequence, verbose=0)[0][0])
             fakta_prob = 1.0 - hoax_prob
         
+        # Menggolongkan hasil klasifikasi dengan batas prediksi probabilitas 50%
         if hoax_prob >= 0.50:
             label = "BERPOTENSI HOAX"
             badge_type = "danger"

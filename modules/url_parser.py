@@ -1,9 +1,13 @@
+# Modul ini digunakan untuk memvalidasi format URL serta mengekstrak konten artikel
+# utama dari suatu halaman web berita atau situs tertentu.
 import re
 import requests
 from bs4 import BeautifulSoup
 
+# Memeriksa apakah teks yang diberikan adalah format URL HTTP/HTTPS yang valid
 def is_valid_url(text):
     """Check if the given string is a HTTP/HTTPS URL."""
+    # Pattern regex untuk mencocokkan protokol, domain, IP, dan port opsional pada URL
     url_pattern = re.compile(
         r'^(?:http|ftp)s?://' # http:// or https://
         r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' # domain...
@@ -13,6 +17,7 @@ def is_valid_url(text):
         r'(?:/?|[/?]\S+)$', re.IGNORECASE)
     return bool(url_pattern.match(text.strip()))
 
+# Mengekstrak judul dan teks artikel utama dari URL yang diberikan
 def extract_content_from_url(url):
     """
     Extract title and main article text from news URL.
@@ -23,16 +28,19 @@ def extract_content_from_url(url):
     }
     
     try:
+        # Melakukan request GET ke URL yang dituju dengan timeout 7 detik
         response = requests.get(url.strip(), headers=headers, timeout=7)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # Remove script and style elements
+        # Menghapus elemen yang tidak relevan agar teks artikel lebih bersih
         for script in soup(["script", "style", "noscript", "header", "footer", "nav"]):
             script.extract()
             
         # Get title
+        # Mengambil judul halaman dari tag title atau fallback ke tag h1
         title = ""
         if soup.title and soup.title.string:
             title = soup.title.string.strip()
@@ -40,14 +48,17 @@ def extract_content_from_url(url):
             title = soup.find('h1').get_text().strip()
             
         # Get main article text paragraphs
+        # Menggabungkan paragraf dengan panjang karakter lebih dari 30
         paragraphs = [p.get_text().strip() for p in soup.find_all('p') if len(p.get_text().strip()) > 30]
         article_text = " ".join(paragraphs)
         
         if not article_text:
             # Fallback to general text
+            # Jika paragraf kosong, ambil seluruh teks di dalam tag body
             article_text = soup.get_text(separator=' ', strip=True)
             
         # Truncate if extremely long
+        # Membatasi panjang teks artikel hingga maksimal 3000 karakter
         if len(article_text) > 3000:
             article_text = article_text[:3000] + "..."
             
