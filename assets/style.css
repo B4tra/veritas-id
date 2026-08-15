@@ -9,9 +9,9 @@ html, body, [class*="css"] {
 .main-header {
     background: linear-gradient(135deg, #1e1e38 0%, #0d1117 100%);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 2.5rem 2rem;
+    padding: 2.2rem 2rem;
     border-radius: 16px;
-    margin-bottom: 2rem;
+    margin-bottom: 1.8rem;
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
@@ -19,16 +19,39 @@ html, body, [class*="css"] {
 .main-header h1 {
     color: #ffffff !important;
     font-weight: 800;
-    font-size: 2.5rem;
+    font-size: 2.4rem;
     letter-spacing: -0.5px;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 .main-header p {
     color: #a0aec0 !important;
-    font-size: 1.05rem;
-    max-width: 700px;
+    font-size: 1.02rem;
+    max-width: 760px;
     margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Step Header Box */
+.step-banner {
+    background: linear-gradient(90deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 5px solid #3b82f6;
+    padding: 1rem 1.4rem;
+    border-radius: 10px;
+    margin-bottom: 1.2rem;
+}
+
+.step-banner h3 {
+    margin: 0 0 0.3rem 0;
+    color: #ffffff;
+    font-size: 1.25rem;
+}
+
+.step-banner p {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.92rem;
 }
 
 /* Badge Label Styles */
@@ -101,11 +124,42 @@ html, body, [class*="css"] {
     background: rgba(229, 62, 62, 0.2);
     color: #fc8181;
     border: 1px solid rgba(229, 62, 62, 0.4);
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.65rem;
     border-radius: 6px;
     font-size: 0.85rem;
     font-weight: 600;
     margin: 0.2rem;
+}
+
+.word-tag-green {
+    display: inline-block;
+    background: rgba(56, 161, 105, 0.2);
+    color: #68d391;
+    border: 1px solid rgba(56, 161, 105, 0.4);
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.2rem;
+}
+
+/* Before After Comparison Box */
+.compare-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.compare-box-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    color: #94a3b8;
 }
 
 /* Footer disclaimer box */

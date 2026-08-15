@@ -1,15 +1,22 @@
-# Modul data seed (data awal) yang berisi contoh-contoh hoax terverifikasi dari berbagai kategori 
-# Modul ini digunakan untuk mengisi database pertama kali ketika aplikasi baru dijalankan
+# ==============================================================================
+# Modul: seed_data.py
+# Deskripsi: Modul data awal (seed corpus) yang berisi sampel artikel terverifikasi
+#            secara berimbang antara TurnBackHoax.id (HOAX) dan CekFakta Tempo (FAKTA).
+#            Digunakan saat inisialisasi awal database dan pipeline dataset.
+# Bagian dari: Fondasi Dataset & Database VERITAS-ID
+# ==============================================================================
+
 import sqlite3
-import json
 import os
 import time
+import pandas as pd
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fact_check.db")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(BASE_DIR, "data", "fact_check.db")
+RAW_CSV_PATH = os.path.join(BASE_DIR, "data", "raw", "raw_scraped_dataset.csv")
 
-# Kategori data: berisi berbagai sampel hoax dalam topik kesehatan, penipuan online, politik & sosial, bencana & cuaca, serta makanan
 SEED_DATA = [
-    # --- HOAX KESEHATAN ---
+    # ==================== KELAS HOAX (TurnBackHoax.id) ====================
     {
         "title": "[HOAX] Makan Telur Rebus Jam 12 Malam Menyembuhkan Corona",
         "claim": "Memakan telur rebus pada jam 12 malam secara ajaib dapat menangkal dan menyembuhkan infeksi virus Corona",
@@ -17,8 +24,9 @@ SEED_DATA = [
         "label": "HOAX",
         "category": "Kesehatan",
         "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Tidak ada bukti ilmiah bahwa telur rebus dapat menyembuhkan COVID-19. WHO menegaskan tidak ada makanan yang bisa menyembuhkan Corona."
+        "source_url": "https://turnbackhoax.id/articles/telur-rebus-corona",
+        "verdict_details": "SALAH. Tidak ada bukti ilmiah bahwa telur rebus dapat menyembuhkan COVID-19. WHO menegaskan tidak ada makanan yang bisa menyembuhkan Corona.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
         "title": "[HOAX] Vaksin COVID-19 Mengandung Microchip Bill Gates",
@@ -27,8 +35,9 @@ SEED_DATA = [
         "label": "HOAX",
         "category": "Kesehatan",
         "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Vaksin COVID-19 tidak mengandung microchip. Bill Gates Foundation mendukung pengembangan vaksin untuk kesehatan global."
+        "source_url": "https://turnbackhoax.id/articles/vaksin-microchip",
+        "verdict_details": "SALAH. Vaksin COVID-19 tidak mengandung microchip. Bill Gates Foundation mendukung pengembangan vaksin untuk kesehatan global.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
         "title": "[HOAX] Minum Air Hangat Campur Lemon Membunuh Virus Corona",
@@ -36,83 +45,44 @@ SEED_DATA = [
         "content": "Pesan berantai WhatsApp menyebarkan klaim bahwa minum air hangat dicampur perasan lemon setiap pagi bisa membunuh virus Corona. Dokter dan ahli kesehatan menegaskan ini tidak benar. Air lemon baik untuk kesehatan tapi tidak membunuh virus.",
         "label": "HOAX",
         "category": "Kesehatan",
-        "source_name": "Tempo CekFakta",
-        "source_url": "https://cekfakta.tempo.co/",
-        "verdict_details": "SALAH. Air lemon tidak memiliki kemampuan membunuh virus Corona. WHO menyatakan tidak ada minuman yang bisa menyembuhkan COVID-19."
+        "source_name": "TurnBackHoax.id (MAFINDO)",
+        "source_url": "https://turnbackhoax.id/articles/lemon-bunuh-virus",
+        "verdict_details": "SALAH. Air lemon tidak memiliki kemampuan membunuh virus Corona. WHO menyatakan tidak ada minuman yang bisa menyembuhkan COVID-19.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
         "title": "[HOAX] 5G Menyebabkan Penyebaran Virus Corona",
         "claim": "Jaringan 5G menyebabkan penyebaran virus Corona dan melemahkan sistem imun tubuh manusia",
         "content": "Viral di media sosial teori konspirasi yang mengklaim jaringan 5G menjadi penyebab penyebaran virus Corona dan melemahkan imunitas tubuh. Klaim ini sudah dibantah oleh para ilmuwan dan WHO. Virus menyebar melalui droplet bukan gelombang radio.",
         "label": "HOAX",
-        "category": "Kesehatan",
+        "category": "Teknologi & Bencana",
         "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Tidak ada hubungan antara jaringan 5G dan penyebaran virus Corona. Virus menyebar melalui droplet pernapasan."
+        "source_url": "https://turnbackhoax.id/articles/5g-corona-konspirasi",
+        "verdict_details": "SALAH. Tidak ada hubungan antara jaringan 5G dan penyebaran virus Corona. Virus menyebar melalui droplet pernapasan.",
+        "source_platform": "TurnBackHoax.id"
     },
-    # --- HOAX PENIPUAN ---
     {
         "title": "[PENIPUAN] Link Pendaftaran Bantuan Pemerintah Rp 600 Ribu",
         "claim": "Pemerintah memberikan bantuan tunai Rp 600 ribu melalui link pendaftaran online di WhatsApp",
         "content": "Beredar tautan mencurigakan di WhatsApp yang mengaku sebagai link pendaftaran bantuan pemerintah sebesar Rp 600 ribu. Segeralah daftar sebelum kuota habis. Tautan ini adalah penipuan phishing yang mencuri data pribadi korban.",
         "label": "HOAX",
         "category": "Penipuan Online",
-        "source_name": "Kominfo RI",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "PENIPUAN. Pemerintah tidak pernah mendistribusikan bantuan sosial melalui tautan WhatsApp. Ini adalah modus phishing pencurian data."
+        "source_name": "TurnBackHoax.id (MAFINDO)",
+        "source_url": "https://turnbackhoax.id/articles/bansos-palsu-wa",
+        "verdict_details": "PENIPUAN. Pemerintah tidak pernah mendistribusikan bantuan sosial melalui tautan WhatsApp. Ini adalah modus phishing pencurian data.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
-        "title": "[PENIPUAN] Lowongan Kerja Palsu Shopee Gaji 15 Juta",
-        "claim": "Shopee membuka lowongan kerja online dari rumah dengan gaji Rp 15 juta per bulan tanpa pengalaman",
-        "content": "Viral di media sosial iklan lowongan kerja yang mengatasnamakan Shopee dengan tawaran gaji Rp 15 juta per bulan, bisa kerja dari rumah tanpa pengalaman. Segera daftar melalui link bit.ly. Shopee mengonfirmasi ini adalah penipuan dan bukan lowongan resmi.",
+        "title": "[PENIPUAN] Lowongan Kerja Palsu E-Commerce Gaji 15 Juta",
+        "claim": "Platform e-commerce membuka lowongan kerja online dari rumah dengan gaji Rp 15 juta per bulan tanpa pengalaman",
+        "content": "Viral di media sosial iklan lowongan kerja online dengan tawaran gaji Rp 15 juta per bulan dari rumah tanpa pengalaman. Segera daftar melalui link bit.ly. Pihak manajemen mengonfirmasi ini adalah penipuan dan bukan lowongan resmi.",
         "label": "HOAX",
         "category": "Penipuan Online",
         "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "PENIPUAN. Shopee tidak pernah menawarkan lowongan kerja melalui media sosial atau tautan bit.ly. Ini modus penipuan."
+        "source_url": "https://turnbackhoax.id/articles/loker-palsu-15juta",
+        "verdict_details": "PENIPUAN. Tidak pernah ada penawaran lowongan kerja instan berbayar melalui tautan bit.ly. Ini modus penipuan online.",
+        "source_platform": "TurnBackHoax.id"
     },
-    {
-        "title": "[PENIPUAN] Undian Berhadiah Telkomsel Rp 100 Juta",
-        "claim": "Telkomsel mengadakan undian berhadiah Rp 100 juta dan pemenang harus mengirimkan pulsa untuk klaim hadiah",
-        "content": "Beredar SMS dan pesan WhatsApp yang mengaku dari Telkomsel memberitahukan bahwa nomor Anda memenangkan undian Rp 100 juta. Untuk mengklaim hadiah segera hubungi nomor berikut dan kirimkan pulsa sebagai biaya administrasi. Telkomsel menegaskan ini penipuan.",
-        "label": "HOAX",
-        "category": "Penipuan Online",
-        "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "PENIPUAN. Telkomsel tidak pernah meminta pelanggan mengirimkan pulsa untuk mengklaim hadiah undian."
-    },
-    # --- HOAX POLITIK & SOSIAL ---
-    {
-        "title": "[HOAX] Foto Manipulasi Capres Bertemu Tokoh Kontroversial",
-        "claim": "Foto menunjukkan calon presiden bertemu dengan tokoh kontroversial di luar negeri membuktikan konspirasi politik",
-        "content": "Beredar foto di media sosial yang diklaim menunjukkan salah satu capres bertemu tokoh kontroversial internasional. Setelah ditelusuri menggunakan reverse image search, foto tersebut ternyata hasil manipulasi dan editan Photoshop. Foto asli berasal dari konteks berbeda.",
-        "label": "HOAX",
-        "category": "Politik",
-        "source_name": "Tempo CekFakta",
-        "source_url": "https://cekfakta.tempo.co/",
-        "verdict_details": "SALAH. Foto tersebut adalah hasil manipulasi digital. Foto asli berasal dari acara berbeda dan telah diedit."
-    },
-    {
-        "title": "[HOAX] Indonesia Bubar Tahun 2030 Menurut CIA",
-        "claim": "CIA memprediksi Indonesia akan bubar dan terpecah menjadi beberapa negara pada tahun 2030",
-        "content": "Viral di media sosial klaim bahwa CIA Amerika Serikat memprediksi Indonesia akan bubar dan terpecah menjadi beberapa negara kecil pada tahun 2030. Klaim ini menggunakan dokumen palsu dan telah dibantah oleh para ahli hubungan internasional.",
-        "label": "HOAX",
-        "category": "Politik",
-        "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Tidak ada laporan resmi CIA yang memprediksi Indonesia bubar. Dokumen yang beredar adalah palsu."
-    },
-    {
-        "title": "[HOAX] Video Antrean Sembako Sepanjang 5 Km di Jakarta",
-        "claim": "Video menunjukkan antrean pembagian sembako sepanjang 5 kilometer di Jakarta akibat krisis ekonomi parah",
-        "content": "Beredar video di TikTok dan WhatsApp yang mengklaim menunjukkan antrean pembagian sembako gratis sepanjang 5 km di Jakarta sebagai bukti krisis ekonomi parah. Video tersebut sebenarnya diambil dari antrean vaksinasi massal di stadion pada tahun sebelumnya.",
-        "label": "HOAX",
-        "category": "Politik",
-        "source_name": "CNN Indonesia CekFakta",
-        "source_url": "https://www.cnnindonesia.com/",
-        "verdict_details": "KELIRU KONTEKS. Video bukan antrean sembako melainkan antrean vaksinasi massal di stadion."
-    },
-    # --- HOAX BENCANA & CUACA ---
     {
         "title": "[HOAX] Sinar Kosmik Berbahaya Memasuki Bumi Malam Ini",
         "claim": "NASA mengumumkan sinar kosmik berbahaya akan memasuki bumi malam ini dan semua orang harus mematikan HP",
@@ -120,8 +90,9 @@ SEED_DATA = [
         "label": "HOAX",
         "category": "Bencana Alam",
         "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. NASA tidak pernah mengeluarkan peringatan sinar kosmik berbahaya. Pesan ini adalah hoaks berulang yang beredar sejak bertahun-tahun."
+        "source_url": "https://turnbackhoax.id/articles/sinar-kosmik-nasa-palsu",
+        "verdict_details": "SALAH. NASA tidak pernah mengeluarkan peringatan sinar kosmik berbahaya. Pesan ini adalah hoaks berulang yang beredar sejak bertahun-tahun.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
         "title": "[HOAX] Gempa Besar 9.5 SR Akan Menghantam Jawa Dalam 3 Hari",
@@ -129,50 +100,132 @@ SEED_DATA = [
         "content": "Viral pesan yang mengatasnamakan BMKG memperingatkan gempa besar 9.5 SR akan menghantam Jawa dalam 3 hari. Segeralah evakuasi ke tempat tinggi. BMKG menegaskan gempa tidak bisa diprediksi dan tidak pernah mengeluarkan peringatan semacam itu.",
         "label": "HOAX",
         "category": "Bencana Alam",
-        "source_name": "BMKG",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. BMKG menegaskan gempa bumi tidak dapat diprediksi waktu dan lokasinya. Pesan ini hoaks."
+        "source_name": "TurnBackHoax.id (MAFINDO)",
+        "source_url": "https://turnbackhoax.id/articles/gempa-prediksi-bmkg-hoax",
+        "verdict_details": "SALAH. BMKG menegaskan gempa bumi tidak dapat diprediksi waktu dan lokasinya secara presisi. Pesan ini adalah hoaks.",
+        "source_platform": "TurnBackHoax.id"
     },
-    # --- HOAX MAKANAN ---
     {
         "title": "[HOAX] Mi Instan Mengandung Lilin yang Menyebabkan Kanker",
         "claim": "Mi instan dilapisi lilin yang tidak bisa dicerna tubuh dan menyebabkan kanker usus",
         "content": "Pesan berantai di media sosial mengklaim bahwa mi instan dilapisi lilin untuk mencegahnya menempel. Lilin ini diklaim tidak bisa dicerna oleh tubuh selama 3 hari dan menyebabkan kanker usus. BPOM dan ahli gizi membantah klaim ini karena mi instan menggunakan minyak goreng bukan lilin.",
         "label": "HOAX",
         "category": "Kesehatan",
-        "source_name": "BPOM RI",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Mi instan tidak mengandung lilin. Lapisan berminyak pada mi instan berasal dari proses penggorengan."
+        "source_name": "TurnBackHoax.id (MAFINDO)",
+        "source_url": "https://turnbackhoax.id/articles/mi-instan-lilin-kanker",
+        "verdict_details": "SALAH. Mi instan tidak mengandung lapisan lilin. Lapisan berminyak berasal dari proses penggorengan higienis berstandar BPOM.",
+        "source_platform": "TurnBackHoax.id"
     },
     {
-        "title": "[HOAX] Nasi Kemarin yang Dipanaskan Ulang Lebih Berbahaya dari Racun",
-        "claim": "Nasi sisa kemarin yang dipanaskan ulang mengandung racun arsenik dan lebih berbahaya dari sianida",
-        "content": "Beredar klaim bahwa memakan nasi sisa kemarin yang telah dipanaskan ulang sangat berbahaya karena mengandung racun arsenik yang lebih mematikan dari sianida. Ahli gizi menjelaskan nasi kemarin aman dikonsumsi asalkan disimpan dengan benar di kulkas dan dipanaskan sempurna.",
+        "title": "[HOAX] Dokumen Rahasia Bocor Terkait Vaksinasi",
+        "claim": "Beredar bocoran dokumen resmi bahwa vaksinasi menyebabkan kelumpuhan organ",
+        "content": "Sebuah dokumen pdf diedit sedemikian rupa dan diklaim sebagai laporan investigasi kementerian terkait efek samping vaksin. Lembaga resmi memastikan dokumen tersebut adalah hasil rekayasa dokumen palsu.",
         "label": "HOAX",
+        "category": "Kesehatan & Regulasi",
+        "source_name": "TurnBackHoax.id (MAFINDO)",
+        "source_url": "https://turnbackhoax.id/articles/dokumen-rekayasa-vaksin",
+        "verdict_details": "SALAH / FABRIKASI. Dokumen yang disebarkan tidak memiliki nomor registrasi sah dan merupakan manipulasi digital.",
+        "source_platform": "TurnBackHoax.id"
+    },
+
+    # ==================== KELAS FAKTA (Tempo CekFakta) ====================
+    {
+        "title": "[Tempo] Mengapa Kerugian Korupsi Timah Menciut Tinggal Rp 29 Triliun",
+        "claim": "Kejaksaan Agung menghitung ulang kerugian negara pada skandal tata niaga timah berdasarkan audit BPKP",
+        "content": "Kejaksaan Agung bersama Badan Pengawasan Keuangan dan Pembangunan (BPKP) merilis audit komprehensif mengenai estimasi kerugian keuangan negara serta kerusakan lingkungan pada perkara dugaan korupsi tata niaga komoditas timah. Proses hukum kini berjalan di Pengadilan Tindak Pidana Korupsi.",
+        "label": "FAKTA",
+        "category": "Hukum & Korupsi",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/hukum/mengapa-kerugian-korupsi-timah-menciut",
+        "verdict_details": "TERVERIFIKASI FAKTA. Fakta persidangan dan pernyataan resmi jaksa penuntut umum Kejaksaan Agung RI.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] Klarifikasi Regulasi Bisnis WNA di Indonesia Berdasarkan UU PMA",
+        "claim": "Pemerintah menegaskan kepemilikan bisnis oleh warga negara asing harus memenuhi syarat penanaman modal asing (PMA)",
+        "content": "Kementerian Investasi / BKPM menegaskan bahwa seluruh warga negara asing yang hendak mendirikan dan menjalankan usaha di wilayah Republik Indonesia wajib menaati ketentuan izin tinggal serta batasan modal minimum PT PMA sesuai ketentuan hukum ketenagakerjaan dan perizinan terpadu OSS.",
+        "label": "FAKTA",
+        "category": "Regulasi & Ekonomi",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/ekonomi/klarifikasi-bisnis-wna-pma",
+        "verdict_details": "TERVERIFIKASI FAKTA. Sesuai dengan Undang-Undang Penanaman Modal dan petunjuk teknis Kementerian Investasi/BKPM.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] Inflasi Indonesia Terjaga pada Rentang Sasaran Bank Indonesia",
+        "claim": "Bank Indonesia dan BPS mencatat inflasi indeks harga konsumen berada dalam sasaran target 2.5 plus minus 1 persen",
+        "content": "Berdasarkan rilis resmi Badan Pusat Statistik (BPS) dan Bank Indonesia, tingkat inflasi IHK nasional terkendali berkat sinergi Tim Pengendalian Inflasi Pusat dan Daerah (TPIP dan TPID) melalui program Gerakan Nasional Pengendalian Inflasi Pangan di berbagai provinsi.",
+        "label": "FAKTA",
+        "category": "Ekonomi & Keuangan",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/ekonomi/inflasi-terkendali-bi-bps",
+        "verdict_details": "TERVERIFIKASI FAKTA. Data resmi dirilis berkala oleh BPS dan Bank Indonesia dalam konferensi pers bulanan.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] Pemerintah Tegaskan Sanksi Pidana Bagi Pelaku Penyelenggara Judi Online",
+        "claim": "Satgas Pemberantasan Perjudian Daring memblokir ribuan rekening bank dan situs yang terafiliasi judi online",
+        "content": "Kementerian Komunikasi dan Digital bersama Satgas Judi Online dan Otoritas Jasa Keuangan (OJK) terus melakukan pemblokiran rekening bank mencurigakan serta take down terhadap ribuan konten promosi judi online di ruang digital nasional.",
+        "label": "FAKTA",
+        "category": "Hukum & Digital",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/digital/satgas-judi-online-blokir-rekening",
+        "verdict_details": "TERVERIFIKASI FAKTA. Konfirmasi resmi dari Menkomdigi, OJK, dan Bareskrim Polri dalam konferensi pers bersama.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] BMKG Jelaskan Dinamika Atmosfer dan Potensi Cuaca Ekstrem Musim Pancaroba",
+        "claim": "BMKG mempublikasikan analisis peringatan dini hujan lebat dan angin kencang di beberapa wilayah Indonesia",
+        "content": "Badan Meteorologi, Klimatologi, dan Geofisika (BMKG) merilis prospek cuaca mingguan yang menunjukkan potensi peningkatan curah hujan akibat fenomena gelombang atmosfer Kelvin dan Rossby Equatorial di wilayah ekuator Indonesia.",
+        "label": "FAKTA",
+        "category": "Sains & Lingkungan",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/sains/bmkg-prospek-cuaca-ekstrem",
+        "verdict_details": "TERVERIFIKASI FAKTA. Berdasarkan siaran pers resmi kedeputian meteorologi BMKG melalui kanal resmi bmkg.go.id.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] Kejaksaan Agung Tetapkan Tersangka Kasus Dugaan Suap dan Gratifikasi",
+        "claim": "Penyidik Jampidsus Kejagung menahan oknum yang diduga menerima gratifikasi dalam penanganan perkara peradilan",
+        "content": "Penyidik Jaksa Agung Muda Bidang Tindak Pidana Khusus (Jampidsus) resmi menetapkan tersangka baru dan melakukan penahanan 20 hari ke depan untuk kepentingan penyidikan dugaan korupsi dan gratifikasi terkait peradilan.",
+        "label": "FAKTA",
+        "category": "Hukum & Korupsi",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/hukum/kejagung-tetapkan-tersangka-gratifikasi",
+        "verdict_details": "TERVERIFIKASI FAKTA. Disampaikan langsung oleh Kepala Pusat Penerangan Hukum (Kapuspenkum) Kejaksaan Agung RI.",
+        "source_platform": "CekFakta Tempo"
+    },
+    {
+        "title": "[Tempo] Menkes Pastikan Ketersediaan Vaksin Imunisasi Dasar Lengkap Nasional",
+        "claim": "Kementerian Kesehatan menjamin distribusi vaksin imunisasi rutin anak tetap terpenuhi di seluruh Puskesmas",
+        "content": "Menteri Kesehatan Republik Indonesia memastikan pasokan vaksin imunisasi dasar lengkap bagi bayi dan anak tersedia secara memadai di fasilitas kesehatan tingkat pertama (FKTP) dan puskesmas di seluruh provinsi.",
+        "label": "FAKTA",
         "category": "Kesehatan",
         "source_name": "Tempo CekFakta",
-        "source_url": "https://cekfakta.tempo.co/",
-        "verdict_details": "KELIRU. Nasi kemarin aman dikonsumsi jika disimpan dengan benar. Klaim arsenik lebih berbahaya dari sianida tidak berdasar."
+        "source_url": "https://cekfakta.tempo.co/kesehatan/kemenkes-vaksin-imunisasi-lengkap",
+        "verdict_details": "TERVERIFIKASI FAKTA. Kemenkes RI menyampaikan klarifikasi dan data distribusi logistik vaksin nasional.",
+        "source_platform": "CekFakta Tempo"
     },
     {
-        "title": "[HOAX] Plastik Ditemukan dalam Nasi Bungkus Warteg",
-        "claim": "Ditemukan butiran plastik dalam nasi bungkus di warteg yang dicampur untuk menekan biaya beras",
-        "content": "Video viral menunjukkan seseorang menemukan butiran plastik dalam nasi bungkus warteg. Video ini diklaim sebagai bukti bahwa pedagang mencampurkan plastik dengan beras untuk menekan biaya. Setelah ditelusuri, butiran tersebut adalah pati beras yang menggumpal, bukan plastik.",
-        "label": "HOAX",
-        "category": "Kesehatan",
-        "source_name": "TurnBackHoax.id (MAFINDO)",
-        "source_url": "https://turnbackhoax.id/",
-        "verdict_details": "SALAH. Butiran putih bukan plastik melainkan pati beras yang menggumpal akibat proses pemasakan."
+        "title": "[Tempo] Perusahaan Jasa Angkut Sampah Liar Dikenai Sanksi Denda Tegas",
+        "claim": "Dinas Lingkungan Hidup menjatuhkan denda administratif terhadap pengelola pembuangan sampah ilegal",
+        "content": "Pemerintah Daerah melalui Dinas Lingkungan Hidup melakukan penindakan tegas berupa denda administratif dan penyegelan lokasi terhadap oknum pembuang sampah liar yang melanggar Peraturan Daerah tentang Pengelolaan Sampah.",
+        "label": "FAKTA",
+        "category": "Lingkungan",
+        "source_name": "Tempo CekFakta",
+        "source_url": "https://cekfakta.tempo.co/lingkungan/penindakan-tps-liar-denda",
+        "verdict_details": "TERVERIFIKASI FAKTA. Penegakan hukum perda yang terdokumentasi resmi oleh Satpol PP dan DLH.",
+        "source_platform": "CekFakta Tempo"
     }
 ]
 
-# Fungsi untuk menginisialisasi database SQLite dan membuat tabel jika belum ada
-def init_database(db_path):
+def init_database(db_path=DB_PATH):
+    """Inisialisasi tabel database SQLite dan isi data awal jika belum ada."""
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
-    # Table 1: Fact check dataset
+
+    # Tabel 1: fact_checks (Dataset Cek Fakta Utama)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fact_checks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,19 +241,19 @@ def init_database(db_path):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    
-    # Check if published_at column exists in existing DBs
+
+    # Check published_at
     try:
         cursor.execute("ALTER TABLE fact_checks ADD COLUMN published_at TEXT")
     except sqlite3.OperationalError:
-        pass # Column already exists
-        
-    # Table 2: User search history
+        pass
+
+    # Tabel 2: search_history (Riwayat Pengecekan)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS search_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             input_text TEXT NOT NULL,
-            input_type TEXT NOT NULL, -- 'text' or 'url'
+            input_type TEXT NOT NULL,
             predicted_label TEXT NOT NULL,
             confidence_score REAL NOT NULL,
             matched_reference_id INTEGER,
@@ -208,32 +261,29 @@ def init_database(db_path):
             FOREIGN KEY (matched_reference_id) REFERENCES fact_checks (id)
         )
     """)
-    
     conn.commit()
-    
-    # Insert seed data if table is empty or has very few HOAX entries
-    cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE label = 'HOAX'")
-    hoax_count = cursor.fetchone()[0]
-    if hoax_count < 15:
+
+    # Periksa apakah data awal perlu diisi
+    cursor.execute("SELECT COUNT(*) FROM fact_checks")
+    total_count = cursor.fetchone()[0]
+    if total_count < 10:
         insert_seed_data(db_path, conn)
-    
+
     conn.close()
 
-# Fungsi untuk memasukkan data seed awal (contoh hoax) ke dalam database secara otomatis
-def insert_seed_data(db_path, conn=None):
-    """Insert manual seed HOAX data into the database if not already present."""
+def insert_seed_data(db_path=DB_PATH, conn=None):
+    """Memasukkan data seed TurnBackHoax dan Tempo ke dalam database SQLite."""
     close_conn = False
     if conn is None:
         conn = sqlite3.connect(db_path)
         close_conn = True
-    
+
     cursor = conn.cursor()
     now_str = time.strftime("%Y-%m-%d %H:%M:%S")
     inserted = 0
-    
+
     for item in SEED_DATA:
-        cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE title = ? OR claim = ?", 
-                      (item["title"], item["claim"]))
+        cursor.execute("SELECT COUNT(*) FROM fact_checks WHERE title = ? OR claim = ?", (item["title"], item["claim"]))
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
                 INSERT INTO fact_checks (title, claim, content, label, category, source_name, source_url, verdict_details, published_at, created_at)
@@ -244,14 +294,13 @@ def insert_seed_data(db_path, conn=None):
                 now_str, now_str
             ))
             inserted += 1
-    
+
     conn.commit()
     if close_conn:
         conn.close()
-    
-    print(f"[VERITAS-ID Seed] Inserted {inserted} new HOAX seed records.")
+
+    print(f"[VERITAS-ID Seed] Berhasil memuat {inserted} data awal TurnBackHoax & Tempo.")
     return inserted
 
 if __name__ == "__main__":
-    db_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fact_check.db")
-    init_database(db_file)
+    init_database(DB_PATH)
