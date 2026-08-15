@@ -56,13 +56,14 @@ def plot_confusion_matrix_heatmap(cm, model_name="Model", cmap="Blues"):
     ax.grid(which='minor', color='#0f172a', linestyle='-', linewidth=2.5)
     ax.tick_params(which='minor', bottom=False, left=False)
 
-    max_val = np.max(cm_arr) if np.max(cm_arr) > 0 else 1
-    thresh = max_val * 0.45
     for i in range(len(classes)):
         for j in range(len(classes)):
             val = int(cm_arr[i][j])
-            # Warna angka kontras tinggi: gelap di atas latar terang, putih di atas latar gelap
-            text_color = '#ffffff' if val > thresh else '#0f172a'
+            # Warna dinamis adaptif berbasis luminance agar teks selalu kontras tinggi:
+            # Teks bold hitam pekat (#000000) pada latar terang, dan bold putih (#ffffff) pada latar gelap.
+            rgba = im.cmap(im.norm(val))
+            luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+            text_color = '#000000' if luminance > 0.55 else '#ffffff'
             ax.text(j, i, f"{val}",
                     ha="center", va="center",
                     color=text_color, fontsize=12, fontweight='bold')
@@ -370,7 +371,7 @@ with tab_pipeline:
     # SUB-TAB 1: SCRAPING MENTAH
     # ----------------------------------------------------------
     with subtab_s1:
-        st.markdown("### 📥 Tahap 1: Scraping / Crawling Dataset Mentah")
+        st.markdown("### Tahap 1: Scraping / Crawling Dataset Mentah")
         st.caption("Pengumpulan artikel berita mentah secara real-time dari TurnBackHoax.id (fokus HOAX) dan CekFakta Tempo (fokus FAKTA).")
 
         df_raw = None
@@ -415,7 +416,7 @@ with tab_pipeline:
             # Tombol Download CSV Mentah
             csv_data = df_raw.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Unduh Dataset Mentah (raw_scraped_dataset.csv)",
+                label="Unduh Dataset Mentah (raw_scraped_dataset.csv)",
                 data=csv_data,
                 file_name="raw_scraped_dataset.csv",
                 mime="text/csv",
@@ -428,7 +429,7 @@ with tab_pipeline:
     # SUB-TAB 2: PREPROCESSING TEKS
     # ----------------------------------------------------------
     with subtab_s2:
-        st.markdown("### 🧹 Tahap 2: Preprocessing Teks Bahasa Indonesia")
+        st.markdown("### Tahap 2: Preprocessing Teks Bahasa Indonesia")
         st.caption("Pembersihan teks terstruktur: Case Folding, Penghapusan URL & Simbol Spesial, Normalisasi Angka/Rupiah/Persen, Penghapusan Stopwords Bahasa Indonesia, dan Tokenisasi Kata.")
 
         df_proc = None
@@ -451,7 +452,7 @@ with tab_pipeline:
             p4.metric("Rata-rata Reduksi Noise", f"{avg_red}%")
 
             st.markdown("---")
-            st.markdown("#### 🔄 Perbandingan Teks: Sebelum vs Sesudah Preprocessing (Before vs After)")
+            st.markdown("#### Perbandingan Teks: Sebelum vs Sesudah Preprocessing (Before vs After)")
             
             # Selector artikel interaktif untuk melihat before vs after
             article_options = [f"{row['id']}: {row['original_title'][:70]}..." for _, row in df_proc.iterrows()]
@@ -503,7 +504,7 @@ with tab_pipeline:
             # Tombol Download Preprocessed CSV
             proc_csv_data = df_proc.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="📥 Unduh Dataset Preprocessed (preprocessed_dataset.csv)",
+                label="Unduh Dataset Preprocessed (preprocessed_dataset.csv)",
                 data=proc_csv_data,
                 file_name="preprocessed_dataset.csv",
                 mime="text/csv"
@@ -515,7 +516,7 @@ with tab_pipeline:
     # SUB-TAB 3: LABELLING & DATASET SPLIT
     # ----------------------------------------------------------
     with subtab_s3:
-        st.markdown("### 🏷️ Tahap 3: Labelling & Stratified Train/Test Split")
+        st.markdown("### Tahap 3: Labelling & Stratified Train/Test Split")
         st.caption("Pelabelan biner ('HOAX' = 1, 'FAKTA' = 0) dan pembagian dataset menjadi 80% Data Latih (Train) dan 20% Data Uji (Test) secara terstratifikasi.")
 
         lbl_stats = get_label_distribution()
@@ -546,7 +547,7 @@ with tab_pipeline:
         st.markdown("---")
         col_tr, col_te = st.columns(2)
         with col_tr:
-            st.markdown(f"#### 📂 1. Data Latih / Training Set 80% ({len(df_train) if df_train is not None else 0} Sampel)")
+            st.markdown(f"#### 1. Data Latih / Training Set 80% ({len(df_train) if df_train is not None else 0} Sampel)")
             if df_train is not None and not df_train.empty:
                 st.dataframe(
                     df_train[['id', 'original_title', 'label_text', 'label_num', 'source_platform']],
@@ -566,7 +567,7 @@ with tab_pipeline:
                 st.info("Train dataset belum terbuat.")
 
         with col_te:
-            st.markdown(f"#### 📂 2. Data Uji / Testing Set 20% ({len(df_test) if df_test is not None else 0} Sampel)")
+            st.markdown(f"#### 2. Data Uji / Testing Set 20% ({len(df_test) if df_test is not None else 0} Sampel)")
             if df_test is not None and not df_test.empty:
                 st.dataframe(
                     df_test[['id', 'original_title', 'label_text', 'label_num', 'source_platform']],
@@ -596,7 +597,7 @@ with tab_pipeline:
         lstm_eval = st.session_state.lstm_model.evaluation_metrics
 
         # Matriks Perbandingan Model
-        st.markdown("#### 🏆 Tabel Komparasi Benchmark Model:")
+        st.markdown("#### Tabel Komparasi Benchmark Model:")
         benchmark_df = get_model_benchmark_table(nlp_eval, lstm_eval)
         st.dataframe(
             benchmark_df,
@@ -617,27 +618,27 @@ with tab_pipeline:
         col_m1, col_m2 = st.columns(2)
 
         with col_m1:
-            st.markdown("#### 📊 1. Evaluasi NLP (TF-IDF + Logistic Regression)")
+            st.markdown("#### 1. Evaluasi NLP (TF-IDF + Logistic Regression)")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Akurasi", f"{nlp_eval['accuracy']}%")
             m2.metric("Presisi", f"{nlp_eval['precision']}%")
             m3.metric("Recall", f"{nlp_eval['recall']}%")
             m4.metric("F1-Score", f"{nlp_eval['f1_score']}%")
 
-            st.markdown("##### 🗺️ Heatmap Confusion Matrix NLP (Data Uji):")
+            st.markdown("##### Heatmap Confusion Matrix NLP (Data Uji):")
             cm_nlp = nlp_eval.get("confusion_matrix", [[1, 0], [0, 1]])
             fig_nlp = plot_confusion_matrix_heatmap(cm_nlp, model_name="NLP Logistic Regression", cmap="Blues")
             st.pyplot(fig_nlp, use_container_width=False)
 
         with col_m2:
-            st.markdown("#### 🧠 2. Evaluasi LSTM (Deep Learning Sequential)")
+            st.markdown("#### 2. Evaluasi LSTM (Deep Learning Sequential)")
             l1, l2, l3, l4 = st.columns(4)
             l1.metric("Akurasi", f"{lstm_eval['accuracy']}%")
             l2.metric("Presisi", f"{lstm_eval['precision']}%")
             l3.metric("Recall", f"{lstm_eval['recall']}%")
             l4.metric("F1-Score", f"{lstm_eval['f1_score']}%")
 
-            st.markdown("##### 🗺️ Heatmap Confusion Matrix LSTM (Data Uji):")
+            st.markdown("##### Heatmap Confusion Matrix LSTM (Data Uji):")
             cm_lstm = lstm_eval.get("confusion_matrix", [[1, 0], [0, 1]])
             fig_lstm = plot_confusion_matrix_heatmap(cm_lstm, model_name="LSTM Deep Learning", cmap="PuBuGn")
             st.pyplot(fig_lstm, use_container_width=False)
@@ -646,14 +647,14 @@ with tab_pipeline:
 # TAB 3: BASIS DATA RUJUKAN CEK FAKTA
 # ==========================================================
 with tab_database:
-    st.markdown("### 📚 Korpus Basis Data Cek Fakta Terverifikasi")
+    st.markdown("### Korpus Basis Data Cek Fakta Terverifikasi")
     st.caption("Data rujukan resmi yang digunakan untuk verifikasi silang (Cross-Checker) dan pelatihan model VERITAS-ID.")
 
     col_f1, col_f2 = st.columns([1.5, 1])
     with col_f1:
         filter_label = st.multiselect("Filter Kelas Label", options=["HOAX", "FAKTA"], default=["HOAX", "FAKTA"])
     with col_f2:
-        sort_choice = st.selectbox("⏳ Urutkan Berdasarkan Waktu/Tanggal:", options=[
+        sort_choice = st.selectbox("Urutkan Berdasarkan Waktu/Tanggal:", options=[
             "Terbaru (Newest First)",
             "Terlama (Oldest First)",
             "ID (Urutan Masuk)"
@@ -683,7 +684,7 @@ with tab_database:
             column_config={
                 "id": st.column_config.NumberColumn("ID", format="%d"),
                 "label": "Kelas Label",
-                "created_at": st.column_config.TextColumn("📅 Tanggal & Waktu Rilis / Input"),
+                "created_at": st.column_config.TextColumn("Tanggal & Waktu Rilis / Input"),
                 "source_name": "Lembaga Sumber",
                 "category": "Kategori",
                 "title": "Judul Artikel / Klaim",
@@ -700,7 +701,7 @@ with tab_database:
 # TAB 4: ADMIN PANEL & PIPELINE RUNNER
 # ==========================================================
 with tab_admin:
-    st.markdown("### ⚙️ Admin Panel - Kontrol Pipeline Runtut (1 -> 2 -> 3 -> 4)")
+    st.markdown("### Admin Panel - Kontrol Pipeline Runtut (1 -> 2 -> 3 -> 4)")
     st.caption("Picu otomatis pengumpulan artikel berita & hoax terbaru dari TurnBackHoax.id & CekFakta Tempo, jalankan preprocessing, labelling, dan latih ulang model NLP & LSTM.")
 
     col_adm1, col_adm2 = st.columns([2, 1])
@@ -712,27 +713,27 @@ with tab_admin:
         page_depth = st.slider("Target Kedalaman Paginasi TurnBackHoax (Halaman):", min_value=10, max_value=120, value=70, step=10, help="Menentukan berapa banyak halaman arsip TurnBackHoax yang dijelajahi secara paralel.")
         workers_val = st.slider("Jumlah Multi-Worker Thread Paralel:", min_value=4, max_value=20, value=12, step=2, help="Jumlah thread paralel untuk mempercepat proses crawling data.")
 
-        if st.button("🚀 Jalankan Pipeline Lengkap (Tahap 1 -> 4) Sekarang", type="primary", use_container_width=True):
+        if st.button("Jalankan Pipeline Lengkap (Tahap 1 -> 4) Sekarang", type="primary", use_container_width=True):
             progress_bar = st.progress(0)
             status_text = st.empty()
 
             # Tahap 1
-            status_text.write("⏳ **Tahap 1/4:** Menjalankan Multi-Threaded Web Scraping (TurnBackHoax & Tempo CekFakta 2026)...")
+            status_text.write(" **Tahap 1/4:** Menjalankan Multi-Threaded Web Scraping (TurnBackHoax & Tempo CekFakta 2026)...")
             progress_bar.progress(25)
             scrape_res = run_scraping_pipeline(max_pages=page_depth, max_workers=workers_val)
 
             # Tahap 2
-            status_text.write("⏳ **Tahap 2/4:** Menjalankan Preprocessing Teks (Case Folding, Cleaning, Stopwords, Tokenisasi)...")
+            status_text.write(" **Tahap 2/4:** Menjalankan Preprocessing Teks (Case Folding, Cleaning, Stopwords, Tokenisasi)...")
             progress_bar.progress(50)
             prep_res = run_preprocessing_pipeline()
 
             # Tahap 3
-            status_text.write("⏳ **Tahap 3/4:** Menjalankan Binary Labelling & Stratified Train/Test Split (80:20)...")
+            status_text.write(" **Tahap 3/4:** Menjalankan Binary Labelling & Stratified Train/Test Split (80:20)...")
             progress_bar.progress(75)
             label_res = run_labelling_pipeline()
 
             # Tahap 4
-            status_text.write("⏳ **Tahap 4/4:** Melatih Ulang Model NLP & LSTM serta Membangun Matriks Evaluasi...")
+            status_text.write(" **Tahap 4/4:** Melatih Ulang Model NLP & LSTM serta Membangun Matriks Evaluasi...")
             progress_bar.progress(90)
             st.session_state.nlp_model.train_model()
             st.session_state.lstm_model.train_model()
@@ -775,7 +776,7 @@ with tab_admin:
             st.rerun()
 
     st.markdown("---")
-    st.markdown("### 🤖 Pengaturan API OpenRouter LLM")
+    st.markdown("### Pengaturan API OpenRouter LLM")
     st.caption("Konfigurasikan OpenRouter API Key agar sistem dapat mengekstrak klaim utama dan merangkum berita secara otomatis menggunakan AI.")
 
     CONFIG_PATH = os.path.join(os.path.dirname(__file__), "data", "config.json")
@@ -808,7 +809,7 @@ with tab_admin:
                 st.success("✅ Pengaturan OpenRouter API Key berhasil disimpan!")
 
         with btn_test_or:
-            if st.button("🧪 Uji Koneksi OpenRouter API", type="primary", use_container_width=True):
+            if st.button("Uji Koneksi OpenRouter API", type="primary", use_container_width=True):
                 if not cfg_llm_key.strip():
                     st.error("⚠️ Masukkan OpenRouter API Key terlebih dahulu.")
                 else:
@@ -834,10 +835,10 @@ with tab_admin:
 # ==========================================================
 with tab_about:
     st.markdown("""
-        ### 📖 PRD & Arsitektur VERITAS-ID
+        ### PRD & Arsitektur VERITAS-ID
         **Sistem Deteksi Hoax Multi-Sumber Berbasis NLP, Deep Learning & LLM**
         
-        #### 🔄 5 Tahapan Alur Data:
+        #### 5 Tahapan Alur Data:
         1. **Tahap 1: Scraping Mentah** -> Mengambil artikel hoax dan klarifikasi dari TurnBackHoax.id & CekFakta Tempo, disimpan ke `data/raw/raw_scraped_dataset.csv`.
         2. **Tahap 2: Preprocessing Teks** -> Case folding, pembersihan URL/mention/simbol, normalisasi rupiah/persen, stopwords removal Bahasa Indonesia, dan tokenisasi ke `data/processed/preprocessed_dataset.csv`.
         3. **Tahap 3: Labelling & Split** -> Pelabelan biner (`HOAX` = 1, `FAKTA` = 0) dan pembagian Stratified 80:20 Train/Test ke `data/labeled/`.
@@ -849,7 +850,7 @@ with tab_about:
 # SIDEBAR: RIWAYAT PENGECEKAN
 # ==========================================================
 with st.sidebar:
-    st.markdown("### 🕒 Riwayat Pengecekan")
+    st.markdown("### Riwayat Pengecekan")
     history_items = get_recent_history(limit=8)
     if history_items:
         for item in history_items:
